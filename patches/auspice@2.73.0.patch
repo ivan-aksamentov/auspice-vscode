@@ -1,0 +1,258 @@
+diff --git a/auspice.js b/auspice.js
+index 6b352c44b3b153fb3da46b72f5379abfe2a6e062..c15394abac825c1e704b4f32fc4c73d27064b1f0 100755
+--- a/auspice.js
++++ b/auspice.js
+@@ -30,7 +30,10 @@ const args = parser.parseArgs();
+ if (args.verbose) global.AUSPICE_VERBOSE = true;
+ 
+ if (args.subcommand === "build") {
+-  build.run(args);
++  build.run(args).catch((error) => {
++    console.error(error);
++    process.exitCode = 1;
++  });
+ } else if (args.subcommand === "view") {
+   view.run(args);
+ } else if (args.subcommand === "develop") {
+diff --git a/cli/build.js b/cli/build.js
+index ad4cb34e06c5c0c731f31e7918eb20b736a1e215..7f0c17f1618fe23820d61e8964a3d608c7475fdf 100644
+--- a/cli/build.js
++++ b/cli/build.js
+@@ -24,7 +24,7 @@ const addParser = (parser) => {
+   subparser.addArgument('--serverless', {action: "storeTrue", help: SUPPRESS});
+ };
+ 
+-const run = (args) => {
++const run = (args) => new Promise((resolve, reject) => {
+ 
+   /* webpack set up */
+   const extensionPath = args.extend ? path.resolve(args.extend) : undefined;
+@@ -40,7 +40,7 @@ const run = (args) => {
+   utils.log("Running webpack compiler");
+   compiler.run((err, stats) => {
+     if (err) {
+-      console.error(err);
++      reject(err);
+       return;
+     }
+     if (stats.hasErrors()) {
+@@ -56,10 +56,11 @@ const run = (args) => {
+       if (customOutputPath) {
+         utils.exportIndexDotHtml({relative: args.serverless});
+       }
++      resolve();
+     }
+   });
+ 
+-};
++});
+ 
+ /* Where should the built files be saved? (or sourced??)
+  * This may grow more complex over time
+diff --git a/src/components/controls/customSelect.js b/src/components/controls/customSelect.js
+index 37f6259398a3ffc42451f4e702956adefb181381..061eb5fa5608c8264488ff907ab39824888995ce 100644
+--- a/src/components/controls/customSelect.js
++++ b/src/components/controls/customSelect.js
+@@ -36,7 +36,18 @@ const customSelectComponents = {
+ // See https://react-select.com/styles for more details
+ export const customSelectStyles = {
+   menu: (base) => ({ ...base, marginTop: 0}),
+-  placeholder: (base) => ({ ...base, color: "#aaa"})
++  placeholder: (base) => ({ ...base, color: "#aaa"}),
++  // react-select renders the control and menu on a white background but leaves
++  // the menu options and the search input at `color: "inherit"`. That inherits
++  // the surrounding host foreground, which follows the editor theme and turns
++  // near-white on dark themes, leaving faint text on the white menu. Pin both to
++  // the dark tone react-select already uses for the selected value so options
++  // stay legible regardless of host theme.
++  input: (base) => ({ ...base, color: "hsl(0, 0%, 20%)"}),
++  option: (base, state) => ({
++    ...base,
++    color: state.isSelected || state.isDisabled ? base.color : "hsl(0, 0%, 20%)"
++  })
+ };
+ 
+ const CustomSelect = (props) => {
+diff --git a/src/components/download/helperFunctions.js b/src/components/download/helperFunctions.js
+index 92481937541295671b2780c356c5ba6a6f5bd116..7fbe11ea90831fe65d427aa3c182583332dc0c7e 100644
+--- a/src/components/download/helperFunctions.js
++++ b/src/components/download/helperFunctions.js
+@@ -148,16 +148,9 @@ const createTsvString = (data, columns=null) => {
+ };
+ 
+ const write = (filename, type, content) => {
+-  /* https://stackoverflow.com/questions/18848860/javascript-array-to-csv/18849208#comment59677504_18849208 */
+-  const blob = new Blob([content], { type: type });
+-  const link = document.createElement("a");
+-  const url = URL.createObjectURL(blob);
+-  link.setAttribute("href", url);
+-  link.setAttribute("download", filename);
+-  link.style.visibility = 'hidden';
+-  document.body.appendChild(link);
+-  link.click();
+-  document.body.removeChild(link);
++  window.dispatchEvent(new CustomEvent("auspice-export", {
++    detail: {filename, mediaType: type, content}
++  }));
+ };
+ 
+ export const areAuthorsPresent = (tree) => {
+diff --git a/src/components/framework/spinner.js b/src/components/framework/spinner.js
+index f48aaf6fc37c5d9e22ddda42eabe8c488a5a6e33..54f7b6c83641c179570b544a9b7fb58ba93ceba7 100644
+--- a/src/components/framework/spinner.js
++++ b/src/components/framework/spinner.js
+@@ -15,7 +15,7 @@ export const PanelSpinner = ({height, width}) => {
+ 
+ export function FullPageSpinner() {
+   return (
+-    <div style={{display: "flex", flexDirection: "column", justifyContent: "center", height: "50vh"}}>
++    <div style={{display: "flex", alignItems: "center", justifyContent: "center", height: "100%"}}>
+       <div className="rootSpinner"> {/* CSS definition in entry index.html */}
+         <SvgLogo/>
+       </div>
+diff --git a/src/components/info/byline.js b/src/components/info/byline.js
+index 8da817e442016ca2d1eae2ed004d106cde2c3ac3..3ae13d6befe17ca2d881e05668719d8c968c2a48 100644
+--- a/src/components/info/byline.js
++++ b/src/components/info/byline.js
+@@ -35,23 +35,13 @@ const AvatarImg = styled.img`
+ `;
+ 
+ /**
+- * Renders the GitHub avatar of the current dataset for datasets with a `buildUrl`
+- * which is a GitHub repo. The avatar image is fetched from GitHub (by the client).
++ * Renders an embedded avatar without making an external image request.
+  */
+ function renderAvatar(t, metadata) {
+-  const { buildAvatar, buildUrl } = metadata;
+-  if (typeof buildAvatar === 'string') {
++  const { buildAvatar } = metadata;
++  if (typeof buildAvatar === 'string' && buildAvatar.startsWith('data:')) {
+     return <AvatarImg alt="avatar" width="28" src={buildAvatar} />;
+   }
+-
+-  if (typeof buildUrl === 'string') {
+-    const match = buildUrl.match(/(https?:\/\/)?(www\.)?github.com\/([^/]+)/);
+-    if (match) {
+-      return (
+-        <AvatarImg alt="avatar" width="28" src={`https://github.com/${match[3]}.png?size=200`}/>
+-      );
+-    }
+-  }
+   return null;
+ }
+ 
+diff --git a/src/components/main/sidebar.tsx b/src/components/main/sidebar.tsx
+index 551be751d37c879f4f849d3392efb8cb655ad309..32766644a25c314c9201bd9b95199377073fe242 100644
+--- a/src/components/main/sidebar.tsx
++++ b/src/components/main/sidebar.tsx
+@@ -2,8 +2,7 @@ import React from "react";
+ import { useSelector } from "react-redux";
+ import {ThemeProvider} from 'styled-components';
+ import Narrative from "../narrative";
+-import NavBar from "../navBar";
++import NavBar, { getNavBarHeight } from "../navBar";
+ import Controls from "../controls/controls";
+ import { SidebarContainer, sidebarTheme } from "./styles";
+-import { narrativeNavBarHeight } from "../../util/globals";
+ import { RootState } from "../../store";
+@@ -24,7 +23,7 @@ export const Sidebar = (
+           width={width}
+         />
+         {displayNarrative ? (
+-          <Narrative height={height - narrativeNavBarHeight} width={width} />
++          <Narrative height={height - getNavBarHeight(true)} width={width} />
+         ) : (
+           <Controls />
+         )}
+diff --git a/src/components/navBar/index.js b/src/components/navBar/index.js
+index 02d4e40962570749f03200e9c2a3a474414bbd23..36ed0afa5716f69495b7a79402f8bf8ec79c1c97 100644
+--- a/src/components/navBar/index.js
++++ b/src/components/navBar/index.js
+@@ -24,10 +24,15 @@ const NavBarContainer = styled.div`
+ const Content = hasExtension("navbarComponent") ?
+   getExtension("navbarComponent") : AuspiceNavBar;
+-
+-
++
++export const getNavBarHeight = (narrative) => Content ?
++  (narrative ? narrativeNavBarHeight : normalNavBarHeight) : 0;
++
+ const NavBar = ({sidebar, toggleHandler, narrativeTitle, width}) => {
+   // const styles = getStyles({minified, narrative: !!narrativeTitle, width});
+   const showSidebarToggle = sidebar && !narrativeTitle;
++  if (!Content) {
++    return <SidebarChevron navHeight={normalNavBarHeight} navWidth={width} display={showSidebarToggle} onClick={toggleHandler}/>;
++  }
+   return (
+     <NavBarContainer>
+       <Content
+diff --git a/src/components/splash/index.js b/src/components/splash/index.js
+index 8dd658339689bc670ffcc20d40e88345ec737060..7e1ecd56fa59a91dad6f7c32fd24a7712995f197 100644
+--- a/src/components/splash/index.js
++++ b/src/components/splash/index.js
+@@ -25,6 +25,7 @@ class Splash extends React.Component {
+     this.state = {available: {}, errorMessage: undefined};
+   }
+   componentDidMount() {
++    if (hasExtension("splashComponent")) return;
+     fetchJSON(`${getServerAddress()}/getAvailable?prefix=${this.props.reduxPathname}`)
+       .then((json) => {
+         this.setState({available: json});
+diff --git a/src/util/extensions.ts b/src/util/extensions.ts
+index 1f7c5caa13cee11efdcb5d3fb748f2ab5cadbe9e..4318297f82e2ebc2c9fdfc83085c28bef7fd658d 100644
+--- a/src/util/extensions.ts
++++ b/src/util/extensions.ts
+@@ -4,30 +4,16 @@ type Extensions = {
+   [key: string]: any
+ }
+ 
+-const registry: Extensions = ((): Extensions => {
+-  if (!process.env.EXTENSION_DATA) {
+-    // console.log("no EXTENSION_DATA found");
+-    return {};
+-  }
+-
+-  const extensions: Extensions = typeof process.env.EXTENSION_DATA === "string" ?
+-    JSON.parse(process.env.EXTENSION_DATA) : process.env.EXTENSION_DATA;
+-
+-  Object.keys(extensions).forEach((key: string) => {
+-    if (key.endsWith("Component")) {
+-      // console.log("loading component", key);
+-      /* "@extensions" is a webpack alias */
+-      extensions[key] = require(`@extensions/${extensions[key]}`).default;
+-    }
+-  });
+-  // console.log("extensions", extensions);
+-
+-  return extensions;
+-})();
++// The stock implementation reads a build-time EXTENSION_DATA env var and does a
++// dynamic `require("@extensions/<name>")`, which relies on webpack's context
++// modules. The auspice-vscode shell bundles this source with Bun, which cannot
++// resolve a dynamic require, so `@extensions` resolves to a module whose default
++// export is the already-resolved registry (components, not module names).
++import registry from "@extensions";
+ 
+ 
+ export const getExtension = (what: string): any | false => {
+-  if (registry[what]) {
++  if (Object.prototype.hasOwnProperty.call(registry, what)) {
+     return registry[what];
+   }
+   console.error("Requested non-existing extension", what);
+diff --git a/webpack.config.js b/webpack.config.js
+index 62f8edff78ec53144d320c74e442e7834f10e695..3e1590eece20c3a0dc9b2cf3d6f580905b359c7b 100644
+--- a/webpack.config.js
++++ b/webpack.config.js
+@@ -231,9 +231,9 @@ const generateConfig = ({extensionPath, devMode=false, customOutputPath, analyze
+     entry,
+     output: {
+       path: outputPath,
+-      filename: `auspice.[name].bundle${!devMode ? ".[contenthash]" : ""}.js`,
++      filename: "auspice.[name].bundle.js",
+       chunkFilename: `auspice.chunk.[name].bundle${!devMode ? ".[chunkhash]" : ""}.js`,
+-      publicPath: "/dist/"
++      publicPath: "auto"
+     },
+     resolve: {
+       alias: aliasesToResolve,

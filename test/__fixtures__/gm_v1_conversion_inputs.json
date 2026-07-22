@@ -1,0 +1,16 @@
+{
+  "complete_pair": {
+    "meta": {
+      "title": "Legacy tree",
+      "updated": "2020-01-01",
+      "color_options": {}
+    },
+    "tree": {
+      "strain": "root",
+      "attr": {
+        "div": 0
+      },
+      "children": []
+    }
+  }
+}

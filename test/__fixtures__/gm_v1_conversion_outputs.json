@@ -1,0 +1,23 @@
+{
+  "complete_pair": {
+    "version": "v2",
+    "meta": {
+      "extensions": {
+        "original_version": "v1"
+      },
+      "colorings": [],
+      "title": "Legacy tree",
+      "updated": "2020-01-01"
+    },
+    "tree": {
+      "children": [],
+      "name": "root",
+      "node_attrs": {
+        "div": 0
+      },
+      "branch_attrs": {
+        "mutations": {}
+      }
+    }
+  }
+}

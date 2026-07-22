@@ -1,0 +1,6 @@
+/.build/
+/.env.local
+/.vscode-test/
+/*.vsix
+/dist/
+/node_modules/

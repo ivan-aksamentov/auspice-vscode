@@ -1,0 +1,12 @@
+{
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": false,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "sortImports": true,
+  "sortTailwindcss": true,
+  "sortPackageJson": true,
+  "jsdoc": true
+}
