@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useRef } from "react"
 import { Provider, useSelector } from "react-redux"
 
 import { ViewerSplash } from "./components"
+import { createPanelDimensionDispatcher } from "./dimensions"
 import { ErrorBoundary } from "./ErrorBoundary"
 import { Toolbar } from "./Toolbar"
 
@@ -19,15 +20,18 @@ export function App(): React.ReactElement {
   useEffect(() => {
     const container = panelsRef.current
     if (container === null) return undefined
+    const dimensions = createPanelDimensionDispatcher((data) => {
+      store.dispatch({ type: BROWSER_DIMENSIONS, data })
+    })
     const observer = new ResizeObserver((entries) => {
       const rect = entries.at(0)?.contentRect
       if (rect === undefined) return
-      const data = { width: rect.width, height: rect.height, docHeight: rect.height }
-      store.dispatch({ type: BROWSER_DIMENSIONS, data })
+      dimensions.update({ width: rect.width, height: rect.height, docHeight: rect.height })
     })
     observer.observe(container)
     return () => {
       observer.disconnect()
+      dimensions.dispose()
     }
   }, [])
   // Auspice picks "mobile" chrome (a floating toggle button and a dimming
