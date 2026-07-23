@@ -1,7 +1,7 @@
 {
   "name": "auspice-vscode",
   "displayName": "Auspice VSCode",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Explore local phylogenetic trees with Auspice in VS Code. Supports Auspice JSON & Newick.",
   "categories": [
     "Other",
