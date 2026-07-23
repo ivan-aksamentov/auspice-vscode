@@ -8,6 +8,32 @@ Explore local phylogenetic datasets with the full [Auspice](https://github.com/n
 
 ![The Auspice viewer open on a Zika dataset inside VS Code, with the Explorer context menu showing "Open in Auspice".](https://raw.githubusercontent.com/ivan-aksamentov/auspice-vscode/main/assets/img/screenshot.png)
 
+## Installation
+
+|                                                                                                                   Visual Studio Marketplace                                                                                                                    |                                                                                                                       GitHub Releases                                                                                                                        |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| [![Install from the Visual Studio Marketplace](https://img.shields.io/badge/Install-VS_Code_Marketplace-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=ivan-aksamentov.auspice-vscode) | [![Download the latest VSIX from GitHub Releases](https://img.shields.io/badge/Download-Latest_VSIX-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ivan-aksamentov/auspice-vscode/releases/latest/download/auspice-vscode.vsix) |
+
+Alternatively, search in the VS Code Extensions view for:
+
+```
+@id:ivan-aksamentov.auspice-vscode
+```
+
+To install from the command line:
+
+```sh
+code --install-extension ivan-aksamentov.auspice-vscode
+```
+
+To install the VSIX downloaded from GitHub Releases or built locally, run:
+
+```sh
+code --install-extension auspice-vscode.vsix
+```
+
+Alternatively, open the Extensions view, select **Views and More Actions...**, choose **Install from VSIX...**, and select the file.
+
 ## Features
 
 - **Trees**: Auspice v2 `.auspice.json` / `.auspicejson`, Newick `.new` / `.nwk` / `.newick`, and legacy v1 `_meta.json` + `_tree.json` pairs, including gzip variants.
@@ -89,36 +115,53 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
 
 VS Code `1.67.0` or newer.
 
-## Building from source
+## Maintenance
+
+<details>
+<summary>Building, quality checks, testing, and releasing</summary>
+
+### Building from source
 
 ```sh
 bun install
 bun run package
 ```
 
-`bun run build` rebuilds the extension host and the bundled Auspice client; `bun run test` runs the full validation suite. `bun run package` writes `auspice-vscode.vsix`.
+`bun run build` rebuilds the extension host and the bundled Auspice client. `bun run package` writes `auspice-vscode.vsix`.
 
-## Releasing
+### Quality checks
 
-Cut a release locally, then push the tag:
+| Command             | Purpose                                             |
+| ------------------- | --------------------------------------------------- |
+| `bun run check`     | Run all static checks (formatting, lint, typecheck) |
+| `bun run fmt`       | Auto-format with oxfmt                              |
+| `bun run fmt:check` | Check formatting without writing                    |
+| `bun run lint`      | Lint with oxlint                                    |
+| `bun run lint:fix`  | Lint and auto-fix                                   |
+| `bun run typecheck` | Type-check with `tsc --noEmit`                      |
 
-```sh
-bun run release <patch|minor|major>   # bumps version, commits, tags
-git push --follow-tags
-```
+### Testing
 
-Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the extension and, if the VSIX is produced, publishes it to GitHub Releases and the VS Code Marketplace. No lint, format, or test gates run in the release; run `bun run check` and `bun run test` locally before releasing.
+| Command                | Purpose                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `bun run test`         | Run the full validation suite (unit, browser, VS Code host) |
+| `bun run test:unit`    | Unit tests only                                             |
+| `bun run test:browser` | Browser tests only                                          |
+| `bun run test:vscode`  | VS Code host tests only                                     |
 
-### VS Code Marketplace setup (one time)
+### Releasing
 
-Marketplace publishing needs a token from Azure DevOps, stored as a repository secret:
+1. Run `bun run check` and `bun run test`.
+2. `bun run release <patch|minor|major>` -- bumps the version, commits, and tags.
+3. `git push --follow-tags` -- the `v*` tag triggers [release.yml](.github/workflows/release.yml), which builds the VSIX and publishes to [GitHub Releases](https://github.com/ivan-aksamentov/auspice-vscode/releases) and the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ivan-aksamentov.auspice-vscode).
 
-1. Create a publisher at <https://marketplace.visualstudio.com/manage> whose ID matches `publisher` in `package.json` (`ivan-aksamentov`).
-2. Sign in to Azure DevOps (<https://dev.azure.com>) with the same Microsoft account and open **User settings -> Personal access tokens**.
-3. Create a token with **Organization: All accessible organizations** and scope **Marketplace: Manage**. Copy it.
-4. In the GitHub repository, add it under **Settings -> Secrets and variables -> Actions** as `VSCE_PAT`.
+#### VS Code Marketplace setup (one time)
 
-Rotate the token before it expires; the workflow reads it from the `VSCE_PAT` secret.
+1. Create a publisher at [Visual Studio Marketplace](https://marketplace.visualstudio.com/manage) whose ID matches `publisher` in `package.json` (`ivan-aksamentov`).
+2. Sign in to [Azure DevOps](https://dev.azure.com) with the same Microsoft account and create a personal access token with **Organization: All accessible organizations** and scope **Marketplace: Manage**.
+3. Add the token as `VSCE_PAT` under the repository's **Settings > Secrets and variables > Actions**. Rotate before expiry.
+
+</details>
 
 ## License
 
