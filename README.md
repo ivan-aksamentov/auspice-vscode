@@ -129,6 +129,16 @@ bun run package
 
 `bun run build` rebuilds the extension host and the bundled Auspice client. `bun run package` writes `auspice-vscode.vsix`.
 
+### Linking a development build
+
+Compile the current checkout and link it into the default VS Code extensions directory:
+
+```sh
+bun run link:vscode
+```
+
+The command creates the stable symlink `~/.vscode/extensions/ivan-aksamentov.auspice-vscode`, replacing older symlinks for the same extension. It stops without modifying regular extension directories, which should be uninstalled through VS Code first. Set `VSCODE_EXTENSIONS_DIR` when VS Code uses a different extensions directory. Run **Developer: Reload Window** afterward to load the build.
+
 ### Quality checks
 
 | Command             | Purpose                                             |

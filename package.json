@@ -39,6 +39,7 @@
     "fmt:check": "oxfmt --check .",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
+    "link:vscode": "bun run build && bun run scripts/link-vscode.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "bun run scripts/test.ts",
     "test:unit": "bun test test/__tests__",
