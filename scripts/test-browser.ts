@@ -44,6 +44,35 @@ const tipLabelDataset = {
     ],
   },
 }
+// Auspice computes the genetic diversity (entropy) bars when the dataset loads, and afterwards only
+// while that panel is on screen. Below the tree, the panel starts below the fold, so zooming into
+// the clade "AB" clears the bars and the panel shows "data loading".
+const entropyDataset = {
+  version: "v2",
+  meta: {
+    title: "Entropy export contract",
+    panels: ["tree", "entropy"],
+    genome_annotations: {
+      nuc: { start: 1, end: 60, strand: "+" },
+      S: { start: 1, end: 60, strand: "+" },
+    },
+  },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: [
+      {
+        name: "AB",
+        node_attrs: { div: 1 },
+        children: [
+          { name: "A", node_attrs: { div: 2 }, branch_attrs: { mutations: { nuc: ["A10G"] } } },
+          { name: "B", node_attrs: { div: 2 }, branch_attrs: { mutations: { nuc: ["C20T"] } } },
+        ],
+      },
+      { name: "C", node_attrs: { div: 1 }, branch_attrs: { mutations: { nuc: ["G30A"] } } },
+    ],
+  },
+}
 const extensionRoot = resolve(import.meta.dirname, "..")
 const bundle = Bun.file(resolve(extensionRoot, "dist", "auspice-client", CLIENT_BUNDLE_FILE))
 const browserPath =
@@ -89,6 +118,15 @@ try {
   )
   assert.deepEqual(tipLabels.pageErrors, [])
 
+  const entropy = await openViewer(entropyDataset)
+  await entropy.page.locator("#d3entropyParent").waitFor()
+  await zoomIntoClade(entropy.page, "AB")
+  await entropy.page.locator("#d3entropyParent").getByText("data loading").waitFor()
+  assert.equal(await entropy.page.locator("#d3entropyParent").getByText("data loading").count(), 1)
+  const [svgExport] = await downloadsFromTreeButtons(entropy.page, ["SVG"])
+  assert.equal(svgExport?.content.includes('<svg id="entropy"'), true)
+  assert.equal(svgExport?.content.includes("data loading"), false)
+  assert.deepEqual(entropy.pageErrors, [])
 } finally {
   await browser.close()
   await server.stop(true)
@@ -198,6 +236,21 @@ async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
     image.remove()
     return outside
   })
+}
+
+/** Zoom the main tree into a clade by clicking its branch */
+async function zoomIntoClade(page: Page, name: string): Promise<void> {
+  await page.evaluate((clade) => {
+    // D3 binds each branch element to its tree node as `__data__`
+    const branch = [...document.querySelectorAll("#MainTree .branch.S")].find((element) => {
+      const data: unknown = Reflect.get(element, "__data__")
+      if (typeof data !== "object" || data === null || !("n" in data)) return false
+      const node: unknown = data.n
+      return typeof node === "object" && node !== null && "name" in node && node.name === clade
+    })
+    if (branch instanceof SVGElement) branch.dataset["testid"] = "zoom-branch"
+  }, name)
+  await page.getByTestId("zoom-branch").click()
 }
 
 /** Press download buttons of the tree panel and return the downloaded files */

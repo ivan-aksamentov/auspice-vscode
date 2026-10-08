@@ -137,10 +137,19 @@ index 7d5645634abeedf7000de5d580755bde8966ac35..08b10f25dd4610f6d2fd30a2038ae7cb
    formatPublications(pubs) {
      return (
 diff --git a/src/components/download/helperFunctions.js b/src/components/download/helperFunctions.js
-index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbbd68907df 100644
+index 92481937541295671b2780c356c5ba6a6f5bd116..520d7ec46206e446c74dbb46466a4a7fe1927deb 100644
 --- a/src/components/download/helperFunctions.js
 +++ b/src/components/download/helperFunctions.js
-@@ -148,16 +148,9 @@ const createTsvString = (data, columns=null) => {
+@@ -9,6 +9,8 @@ import { datasetSummary } from "../info/datasetSummary";
+ import { isColorByGenotype } from "../../util/getGenotype";
+ import { EmptyNewickTreeCreated } from "../../util/exceptions";
+ import { createDatasetJson } from "../../util/constructDatasetJson";
++import { calcEntropyInView } from "../../util/entropy";
++import { ENTROPY_DATA } from "../../actions/types";
+ 
+ export const isPaperURLValid = (d) => {
+   return (
+@@ -148,16 +150,9 @@ const createTsvString = (data, columns=null) => {
  };
  
  const write = (filename, type, content) => {
@@ -160,7 +169,7 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbb
  };
  
  export const areAuthorsPresent = (tree) => {
-@@ -428,6 +421,60 @@ const processXMLString = (input) => {
+@@ -428,6 +423,60 @@ const processXMLString = (input) => {
    };
  };
  
@@ -221,7 +230,7 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbb
  /* take the panels (see processXMLString for struct) and calculate the overall size of the SVG
  as well as the offsets (x, y) to position panels appropriately within this */
  const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLinesOfText) => {
-@@ -530,7 +577,8 @@ const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLines
+@@ -530,7 +579,8 @@ const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLines
  };
  
  const injectAsSVGStrings = (output, key, data) => {
@@ -231,7 +240,7 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbb
    // if (data.viewbox) svgTag = svgTag.replace(">", ` viewBox="${data.viewbox.join(" ")}">`);
    output.push(svgTag);
    output.push(data.inner);
-@@ -544,7 +592,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -544,7 +594,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
    const panels = {tree: undefined, map: undefined, entropy: undefined, frequencies: undefined};
    if (panelsInDOM.indexOf("tree") !== -1) {
      try {
@@ -240,7 +249,7 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbb
        panels.treeLegend = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("TreeLegendContainer")));
      } catch (e) {
        panels.tree = undefined;
-@@ -553,7 +601,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -553,7 +603,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
      }
      if (panels.tree && document.getElementById('SecondTree')) {
        try {
@@ -249,7 +258,7 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbb
          if (document.getElementById('Tangle')) {
            panels.tangle = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("Tangle")));
          }
-@@ -610,7 +658,8 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -610,7 +660,8 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
    const output = [];
    /* logic for extracting the overall width etc */
    const overallDimensions = createBoundingDimensionsAndPositionPanels(panels, panelLayout, textStrings.length);
@@ -259,6 +268,32 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbb
    for (const key in panels) {
      if (panels[key]) {
        injectAsSVGStrings(output, key, panels[key]); // modifies output in place
+@@ -644,6 +695,25 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+ };
+ 
+ export const SVG = (dispatch, t, metadata, nodes, visibility, filePrefix, panelsInDOM, panelLayout, publications) => {
++  /* The entropy panel computes its bars only while it is on screen, and shows "data loading" below
++  the fold. Compute the bars for the export, and write after the panel has drawn them. */
++  if (panelsInDOM.indexOf("entropy") !== -1 && dispatch(calcEntropyBarsIfMissing)) {
++    setTimeout(() => writeSVG(dispatch, t, metadata, nodes, visibility, filePrefix, panelsInDOM, panelLayout, publications), 0);
++    return;
++  }
++  writeSVG(dispatch, t, metadata, nodes, visibility, filePrefix, panelsInDOM, panelLayout, publications);
++};
++
++/* Thunk: compute the entropy bars if the panel has none, and return whether it computed them */
++const calcEntropyBarsIfMissing = (dispatch, getState) => {
++  const { entropy, tree } = getState();
++  if (entropy.bars !== undefined || !entropy.genomeMap || !tree.nodes || !tree.visibility) return false;
++  const [data, maxYVal] = calcEntropyInView(tree.nodes, tree.visibility, entropy.selectedCds, entropy.showCounts);
++  dispatch({type: ENTROPY_DATA, data, maxYVal});
++  return true;
++};
++
++const writeSVG = (dispatch, t, metadata, nodes, visibility, filePrefix, panelsInDOM, panelLayout, publications) => {
+   /* make the text strings */
+   const textStrings = [];
+   textStrings.push(metadata.title);
 diff --git a/src/components/framework/spinner.js b/src/components/framework/spinner.js
 index f48aaf6fc37c5d9e22ddda42eabe8c488a5a6e33..54f7b6c83641c179570b544a9b7fb58ba93ceba7 100644
 --- a/src/components/framework/spinner.js
