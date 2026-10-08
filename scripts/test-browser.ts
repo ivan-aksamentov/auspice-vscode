@@ -7,6 +7,43 @@ import type { Page } from "@playwright/test"
 
 import { CLIENT_BUNDLE_FILE } from "../src/auspiceAssets"
 
+const contractDataset = {
+  version: "v2",
+  meta: {
+    title: "Browser rendering contract",
+    panels: ["tree", "map"],
+    colorings: [{ key: "country", title: "Country", type: "categorical" }],
+    geo_resolutions: [
+      { key: "country", demes: { Switzerland: { latitude: 46.8, longitude: 8.2 } } },
+    ],
+  },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0, country: { value: "Switzerland" } },
+    children: [
+      { name: "A", node_attrs: { div: 1, country: { value: "Switzerland" } } },
+      { name: "B", node_attrs: { div: 1, country: { value: "Switzerland" } } },
+    ],
+  },
+}
+// A tip label margin sized from the first tip (8 characters) cuts the longer names after it.
+// Capital "W" is wider than the margin estimate per character, so the last label extends past the
+// tree panel on screen.
+const LONG_TIP_NAME = "HCoV_229E_Portugal_16_2026"
+const WIDE_TIP_NAME = "W".repeat(20)
+const tipLabelDataset = {
+  version: "v2",
+  meta: { title: "Tip label contract", panels: ["tree"] },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: [
+      { name: "PZ086211", node_attrs: { div: 1 } },
+      { name: LONG_TIP_NAME, node_attrs: { div: 1 } },
+      { name: WIDE_TIP_NAME, node_attrs: { div: 1 } },
+    ],
+  },
+}
 const extensionRoot = resolve(import.meta.dirname, "..")
 const bundle = Bun.file(resolve(extensionRoot, "dist", "auspice-client", CLIENT_BUNDLE_FILE))
 const browserPath =
@@ -35,26 +72,17 @@ const server = Bun.serve({
 })
 const browser = await chromium.launch({ executablePath: browserPath, headless: true })
 try {
-  const page = await browser.newPage({ viewport: { width: 1_400, height: 900 } })
-  const pageErrors: string[] = []
-  page.on("pageerror", (error) => pageErrors.push(error.message))
-  await page.route("**/*", async (route) => {
-    const requestUrl = new URL(route.request().url())
-    await (requestUrl.origin === server.url.origin ? route.continue() : route.abort())
-  })
-  await page.goto(server.url.toString())
-  await page.waitForFunction(
-    () =>
-      window.viewerMessages?.some(
-        (value) =>
-          typeof value === "object" && value !== null && "type" in value && value.type === "ready",
-      ) === true,
-  )
-  await loadDataset(page, false)
+  const { page, pageErrors } = await openViewer(contractDataset)
   await page.getByText("Color By", { exact: true }).waitFor()
   await page.locator('button[data-for="EditButton"]').waitFor()
   assert.equal(await page.locator(".mapboxgl-map").count(), 0)
   assert.deepEqual(pageErrors, [])
+
+  const tipLabels = await openViewer(tipLabelDataset)
+  await tipLabels.page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
+  assert.deepEqual(await tipLabelsPastTreePanel(tipLabels.page), [WIDE_TIP_NAME])
+  assert.deepEqual(tipLabels.pageErrors, [])
+
 } finally {
   await browser.close()
   await server.stop(true)
@@ -75,29 +103,43 @@ function browserHtml(): string {
 </html>`
 }
 
-async function loadDataset(page: Page, mapsEnabled: boolean): Promise<void> {
-  const content = JSON.stringify({
-    version: "v2",
-    meta: {
-      title: "Browser rendering contract",
-      panels: ["tree", "map"],
-      colorings: [{ key: "country", title: "Country", type: "categorical" }],
-      geo_resolutions: [
-        { key: "country", demes: { Switzerland: { latitude: 46.8, longitude: 8.2 } } },
-      ],
-    },
-    tree: {
-      name: "root",
-      node_attrs: { div: 0, country: { value: "Switzerland" } },
-      children: [
-        { name: "A", node_attrs: { div: 1, country: { value: "Switzerland" } } },
-        { name: "B", node_attrs: { div: 1, country: { value: "Switzerland" } } },
-      ],
-    },
+async function openViewer(dataset: unknown): Promise<{ page: Page; pageErrors: string[] }> {
+  const page = await browser.newPage({ viewport: { width: 1_400, height: 900 } })
+  const pageErrors: string[] = []
+  page.on("pageerror", (error) => pageErrors.push(error.message))
+  await page.route("**/*", async (route) => {
+    const requestUrl = new URL(route.request().url())
+    await (requestUrl.origin === server.url.origin ? route.continue() : route.abort())
   })
+  await page.goto(server.url.toString())
+  await page.waitForFunction(
+    () =>
+      window.viewerMessages?.some(
+        (value) =>
+          typeof value === "object" && value !== null && "type" in value && value.type === "ready",
+      ) === true,
+  )
+  await loadDataset(page, dataset, false)
+  return { page, pageErrors }
+}
+
+/** Return the tip labels that extend past the right edge of the tree panel on screen */
+function tipLabelsPastTreePanel(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const tree = document.getElementById("MainTree")
+    const width = Number(tree?.getAttribute("width"))
+    const right = (tree?.closest("svg")?.getBoundingClientRect().left ?? 0) + width
+    return [...document.querySelectorAll("#MainTree .tipLabel")]
+      .filter((label) => label.getBoundingClientRect().right > right)
+      .map((label) => label.textContent ?? "")
+  })
+}
+
+async function loadDataset(page: Page, dataset: unknown, mapsEnabled: boolean): Promise<void> {
+  const content = JSON.stringify(dataset)
   await page.evaluate(
-    ({ dataset, showMaps }) => {
-      const bytes = new TextEncoder().encode(dataset).buffer
+    ({ datasetJson, showMaps }) => {
+      const bytes = new TextEncoder().encode(datasetJson).buffer
       window.postMessage(
         {
           type: "load",
@@ -112,7 +154,7 @@ async function loadDataset(page: Page, mapsEnabled: boolean): Promise<void> {
         "*",
       )
     },
-    { dataset: content, showMaps: mapsEnabled },
+    { datasetJson: content, showMaps: mapsEnabled },
   )
   await page.waitForFunction(
     () =>
