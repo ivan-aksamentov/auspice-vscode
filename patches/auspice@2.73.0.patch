@@ -73,6 +73,19 @@ index 37f6259398a3ffc42451f4e702956adefb181381..061eb5fa5608c8264488ff907ab39824
  };
  
  const CustomSelect = (props) => {
+diff --git a/src/components/download/downloadButtons.js b/src/components/download/downloadButtons.js
+index e07b57c5760fca3edac1ddd04893051b1ff7f6a6..65b435b166e063053a2b4a10127d389b1e3d1f55 100644
+--- a/src/components/download/downloadButtons.js
++++ b/src/components/download/downloadButtons.js
+@@ -112,7 +112,7 @@ export const DownloadButtons = ({ relevantPublications }) => {
+             state.tree.visibility,
+             getFilePrefix(),
+             state.controls.panelsToDisplay,
+-            state.controls.panelLayout.panelLayout,
++            state.controls.panelLayout,
+             relevantPublications
+           )}
+         />
 diff --git a/src/components/download/helperFunctions.js b/src/components/download/helperFunctions.js
 index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbbd68907df 100644
 --- a/src/components/download/helperFunctions.js
