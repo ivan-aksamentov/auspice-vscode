@@ -28,7 +28,7 @@ const contractDataset = {
 }
 // A tip label margin sized from the first tip (8 characters) cuts the longer names after it.
 // Capital "W" is wider than the margin estimate per character, so the last label extends past the
-// tree panel on screen.
+// tree panel on screen and must stay complete in the SVG export.
 const LONG_TIP_NAME = "HCoV_229E_Portugal_16_2026"
 const WIDE_TIP_NAME = "W".repeat(20)
 const tipLabelDataset = {
@@ -81,6 +81,7 @@ try {
   const tipLabels = await openViewer(tipLabelDataset)
   await tipLabels.page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
   assert.deepEqual(await tipLabelsPastTreePanel(tipLabels.page), [WIDE_TIP_NAME])
+  assert.deepEqual(await treeLabelsOutsideSvgExport(tipLabels.page), [])
   assert.deepEqual(tipLabels.pageErrors, [])
 
 } finally {
@@ -135,6 +136,65 @@ function tipLabelsPastTreePanel(page: Page): Promise<string[]> {
   })
 }
 
+/**
+ * Export the SVG screenshot and return the tree labels that are not fully visible in it: labels
+ * outside the image, or outside the tree panel when the panel clips its content
+ */
+async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
+  await page.evaluate(() => {
+    window.svgExports = []
+    window.addEventListener("auspice-export", (event) => {
+      const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
+      if (typeof detail === "object" && detail !== null && "content" in detail) {
+        window.svgExports?.push(String(detail.content))
+      }
+    })
+  })
+  await page.getByRole("button", { name: "Download data" }).click()
+  await page.getByRole("button", { name: /^Screenshot \(SVG\)/u }).click()
+  await page.waitForFunction(() => (window.svgExports?.length ?? 0) > 0)
+  // The "d" key toggles Auspice's download modal
+  await page.keyboard.press("d")
+  await page.getByRole("button", { name: /^Screenshot \(SVG\)/u }).waitFor({ state: "detached" })
+  return page.evaluate(() => {
+    const exported = new DOMParser().parseFromString(window.svgExports?.[0] ?? "", "image/svg+xml")
+    const image = document.importNode(exported.documentElement, true)
+    document.body.append(image)
+    const imageRect = image.getBoundingClientRect()
+    const [viewBoxX = 0, viewBoxY = 0] = (image.getAttribute("viewBox") ?? "")
+      .split(" ")
+      .map(Number)
+    const panel = image.querySelector('svg[id="tree"]')
+    const panelLeft = imageRect.left - viewBoxX + Number(panel?.getAttribute("x"))
+    const panelTop = imageRect.top - viewBoxY + Number(panel?.getAttribute("y"))
+    // Standalone SVG viewers clip a nested <svg> at its viewport unless it has overflow="visible"
+    const bounds =
+      panel?.getAttribute("overflow") === "visible"
+        ? imageRect
+        : {
+            left: panelLeft,
+            top: panelTop,
+            right: panelLeft + Number(panel?.getAttribute("width")),
+            bottom: panelTop + Number(panel?.getAttribute("height")),
+          }
+    const outside = [...image.querySelectorAll('svg[id="tree"] text')]
+      .filter((label) => {
+        const rect = label.getBoundingClientRect()
+        return (
+          rect.width > 0 &&
+          getComputedStyle(label).visibility !== "hidden" &&
+          (rect.left < bounds.left ||
+            rect.right > bounds.right ||
+            rect.top < bounds.top ||
+            rect.bottom > bounds.bottom)
+        )
+      })
+      .map((label) => label.textContent ?? "")
+    image.remove()
+    return outside
+  })
+}
+
 async function loadDataset(page: Page, dataset: unknown, mapsEnabled: boolean): Promise<void> {
   const content = JSON.stringify(dataset)
   await page.evaluate(
@@ -171,5 +231,6 @@ async function loadDataset(page: Page, dataset: unknown, mapsEnabled: boolean): 
 declare global {
   interface Window {
     viewerMessages?: readonly unknown[]
+    svgExports?: string[]
   }
 }

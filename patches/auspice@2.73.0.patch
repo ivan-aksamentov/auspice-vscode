@@ -74,7 +74,7 @@ index 37f6259398a3ffc42451f4e702956adefb181381..061eb5fa5608c8264488ff907ab39824
  
  const CustomSelect = (props) => {
 diff --git a/src/components/download/helperFunctions.js b/src/components/download/helperFunctions.js
-index 92481937541295671b2780c356c5ba6a6f5bd116..7fbe11ea90831fe65d427aa3c182583332dc0c7e 100644
+index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbbd68907df 100644
 --- a/src/components/download/helperFunctions.js
 +++ b/src/components/download/helperFunctions.js
 @@ -148,16 +148,9 @@ const createTsvString = (data, columns=null) => {
@@ -97,6 +97,105 @@ index 92481937541295671b2780c356c5ba6a6f5bd116..7fbe11ea90831fe65d427aa3c1825833
  };
  
  export const areAuthorsPresent = (tree) => {
+@@ -428,6 +421,60 @@ const processXMLString = (input) => {
+   };
+ };
+ 
++/* Tree labels can extend past the panel edge: long tip labels, and axis labels centred on a grid
++line at the edge. Serialize a tree panel (see processXMLString for struct) and add `labelBox`, the
++box (in panel coordinates) that the panel and its labels occupy, so that the export can show
++these labels. Labels anchored outside the panel are never visible on screen, so they are removed. */
++const processTreePanel = (treeGroup) => {
++  const origin = treeGroup.ownerSVGElement.getBoundingClientRect();
++  const width = parseFloat(treeGroup.getAttribute("width"));
++  const height = parseFloat(treeGroup.getAttribute("height"));
++  const copy = treeGroup.cloneNode(true);
++  const copiedLabels = copy.querySelectorAll("text");
++  const labelBox = {left: 0, top: 0, right: width, bottom: height};
++  treeGroup.querySelectorAll("text").forEach((label, i) => {
++    const style = window.getComputedStyle(label);
++    const rect = label.getBoundingClientRect();
++    if (!label.textContent.trim() || !rect.width || style.visibility === "hidden") return;
++    const left = rect.left - origin.left;
++    const right = rect.right - origin.left;
++    const top = rect.top - origin.top;
++    const bottom = rect.bottom - origin.top;
++    const anchor = labelAnchorX(left, right, style.textAnchor);
++    if (anchor < 0 || anchor > width || bottom < 0 || top > height) {
++      copiedLabels[i].setAttribute("display", "none");
++      return;
++    }
++    labelBox.left = Math.min(labelBox.left, left);
++    labelBox.top = Math.min(labelBox.top, top);
++    labelBox.right = Math.max(labelBox.right, right);
++    labelBox.bottom = Math.max(labelBox.bottom, bottom);
++  });
++  const panel = processXMLString((new XMLSerializer()).serializeToString(copy));
++  return panel && {...panel, labelBox};
++};
++
++const labelAnchorX = (left, right, textAnchor) => {
++  if (textAnchor === "middle") return (left + right) / 2;
++  if (textAnchor === "end") return right;
++  return left;
++};
++
++/* Return the image box (x, y, width, height) that holds the positioned panels and the tree labels
++which extend past their panel, with a margin around those labels */
++const boundsIncludingTreeLabels = (panels, overallDimensions) => {
++  const margin = 10;
++  let [left, top, right, bottom] = [0, 0, overallDimensions.width, overallDimensions.height];
++  [panels.tree, panels.secondTree].forEach((panel) => {
++    if (!panel?.labelBox) return;
++    left = Math.min(left, panel.x + panel.labelBox.left - margin);
++    top = Math.min(top, panel.y + panel.labelBox.top - margin);
++    right = Math.max(right, panel.x + panel.labelBox.right + margin);
++    bottom = Math.max(bottom, panel.y + panel.labelBox.bottom + margin);
++  });
++  return {x: left, y: top, width: right - left, height: bottom - top};
++};
++
+ /* take the panels (see processXMLString for struct) and calculate the overall size of the SVG
+ as well as the offsets (x, y) to position panels appropriately within this */
+ const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLinesOfText) => {
+@@ -530,7 +577,8 @@ const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLines
+ };
+ 
+ const injectAsSVGStrings = (output, key, data) => {
+-  const svgTag = `<svg id="${key}" width="${data.width}" height="${data.height}" x="${data.x}" y="${data.y}">`;
++  const overflow = data.labelBox ? ` overflow="visible"` : "";
++  const svgTag = `<svg id="${key}" width="${data.width}" height="${data.height}" x="${data.x}" y="${data.y}"${overflow}>`;
+   // if (data.viewbox) svgTag = svgTag.replace(">", ` viewBox="${data.viewbox.join(" ")}">`);
+   output.push(svgTag);
+   output.push(data.inner);
+@@ -544,7 +592,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+   const panels = {tree: undefined, map: undefined, entropy: undefined, frequencies: undefined};
+   if (panelsInDOM.indexOf("tree") !== -1) {
+     try {
+-      panels.tree = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("MainTree")));
++      panels.tree = processTreePanel(document.getElementById("MainTree"));
+       panels.treeLegend = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("TreeLegendContainer")));
+     } catch (e) {
+       panels.tree = undefined;
+@@ -553,7 +601,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+     }
+     if (panels.tree && document.getElementById('SecondTree')) {
+       try {
+-        panels.secondTree = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("SecondTree")));
++        panels.secondTree = processTreePanel(document.getElementById("SecondTree"));
+         if (document.getElementById('Tangle')) {
+           panels.tangle = processXMLString((new XMLSerializer()).serializeToString(document.getElementById("Tangle")));
+         }
+@@ -610,7 +658,8 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+   const output = [];
+   /* logic for extracting the overall width etc */
+   const overallDimensions = createBoundingDimensionsAndPositionPanels(panels, panelLayout, textStrings.length);
+-  output.push(`<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="${overallDimensions.width}" height="${overallDimensions.height}">`);
++  const bounds = boundsIncludingTreeLabels(panels, overallDimensions);
++  output.push(`<svg xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}">`);
+   for (const key in panels) {
+     if (panels[key]) {
+       injectAsSVGStrings(output, key, panels[key]); // modifies output in place
 diff --git a/src/components/framework/spinner.js b/src/components/framework/spinner.js
 index f48aaf6fc37c5d9e22ddda42eabe8c488a5a6e33..54f7b6c83641c179570b544a9b7fb58ba93ceba7 100644
 --- a/src/components/framework/spinner.js
