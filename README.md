@@ -41,6 +41,7 @@ Alternatively, open the Extensions view, select **Views and More Actions...**, c
 - **Metadata**: apply CSV, TSV, XLSX, or node-data JSON to the active view.
 - **Comparison and narratives**: open a second tree in a tangle view, or render a local Markdown narrative with its referenced datasets.
 - **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels.
+- **Downloads**: the SVG, JSON, and NWK buttons above the tree save the current view as a figure, an Auspice dataset, or a Newick tree. The save dialog proposes a file next to the dataset, named after it.
 
 Each primary dataset opens in its own tab with an independent store and file lifecycle.
 

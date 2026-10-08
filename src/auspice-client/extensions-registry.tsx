@@ -1,4 +1,5 @@
 import { ViewerSplash } from "./components"
+import { TreeDownloadButtons } from "./TreeDownloadButtons"
 
 // Auspice resolves customisations through `getExtension`/`hasExtension`
 // (`@auspice/util/extensions`). Its stock implementation reads a build-time
@@ -17,6 +18,7 @@ import { ViewerSplash } from "./components"
 const registry: Record<string, unknown> = {
   navbarComponent: null,
   splashComponent: ViewerSplash,
+  treeButtonsComponent: TreeDownloadButtons,
   filePrefix: "view",
   entryPage: "splash",
   browserTitle: "Auspice Tree Viewer",

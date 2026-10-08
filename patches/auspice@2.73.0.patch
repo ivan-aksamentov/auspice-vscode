@@ -103,6 +103,39 @@ index e07b57c5760fca3edac1ddd04893051b1ff7f6a6..65b435b166e063053a2b4a10127d389b
    return "nextstrain_" +
      window.location.pathname
          .replace(/^\//, '')       // Remove leading slashes
+diff --git a/src/components/download/downloadModal.js b/src/components/download/downloadModal.js
+index 7d5645634abeedf7000de5d580755bde8966ac35..08b10f25dd4610f6d2fd30a2038ae7cb16a872f0 100644
+--- a/src/components/download/downloadModal.js
++++ b/src/components/download/downloadModal.js
+@@ -14,6 +14,15 @@ import { DownloadButtons } from "./downloadButtons";
+ //   Derived data, such as phylogenies, can be downloaded below - please contact the relevant authors where appropriate.`
+ // ];
+ 
++/* publications cited by the downloads for the current coloring */
++export const relevantPublications = (colorBy) => {
++  const x = [publications.nextstrain, publications.treetime];
++  if (["cTiter", "rb", "ep", "ne"].indexOf(colorBy) !== -1) {
++    x.push(publications.titers);
++  }
++  return x;
++};
++
+ export const publications = {
+   nextstrain: {
+     author: "Hadfield et al",
+@@ -46,11 +55,7 @@ export const publications = {
+ }))
+ class DownloadModalContents extends React.Component {
+   getRelevantPublications() {
+-    const x = [publications.nextstrain, publications.treetime];
+-    if (["cTiter", "rb", "ep", "ne"].indexOf(this.props.colorBy) !== -1) {
+-      x.push(publications.titers);
+-    }
+-    return x;
++    return relevantPublications(this.props.colorBy);
+   }
+   formatPublications(pubs) {
+     return (
 diff --git a/src/components/download/helperFunctions.js b/src/components/download/helperFunctions.js
 index 92481937541295671b2780c356c5ba6a6f5bd116..97e9883a5e772f227970f4dcd44bbcbbd68907df 100644
 --- a/src/components/download/helperFunctions.js
@@ -449,6 +482,34 @@ index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..242c7d9625cd04f78781fa4f320ef3a6
  }
  
  // ---------- PhyloNode ---------- //
+diff --git a/src/components/tree/treeButtons.tsx b/src/components/tree/treeButtons.tsx
+index 4e5f9192cbbc051e0d17e27c99cc302a79dd5ab0..0f0054319408805204629d788bafead885d9f4a5 100644
+--- a/src/components/tree/treeButtons.tsx
++++ b/src/components/tree/treeButtons.tsx
+@@ -4,6 +4,7 @@ import { Root, updateVisibleTipsAndBranchThicknesses } from "../../actions/tree"
+ import { getParentBeyondPolytomy, getParentStream } from "./phyloTree/helpers";
+ import { tabSingle, darkGrey, lightGrey } from "../../globalStyles";
+ import { TreeComponentProps } from "./types";
++import { getExtension, hasExtension } from "../../util/extensions";
+ 
+ type Props = TreeComponentProps & {
+   /* RHS offset in pixels */
+@@ -30,9 +31,15 @@ export function TreeButtons(props: Props): ReactElement {
+   const selectedButtonStyles: React.CSSProperties = {...baseButtonStyles, cursor: "pointer", color: darkGrey, pointerEvents: "auto"};
+   const unselectedButtonStyles: React.CSSProperties = {...baseButtonStyles, cursor: "auto", color: lightGrey, pointerEvents: "none"};
+ 
++  /* buttons of the embedding app (e.g. downloads), shown before the zoom buttons of the main tree */
++  const AppButtons = props.mainTree && hasExtension("treeButtonsComponent") ?
++    getExtension("treeButtonsComponent") : null;
++
+   return (
+     <div style={containerStyles}>
+       
++      {AppButtons && <AppButtons buttonStyle={selectedButtonStyles} />}
++
+       <button style={treeZoomed ? selectedButtonStyles : unselectedButtonStyles} onClick={zoomBack}>
+         <FaSearchMinus/>
+       </button>
 diff --git a/src/util/extensions.ts b/src/util/extensions.ts
 index 1f7c5caa13cee11efdcb5d3fb748f2ab5cadbe9e..4318297f82e2ebc2c9fdfc83085c28bef7fd658d 100644
 --- a/src/util/extensions.ts

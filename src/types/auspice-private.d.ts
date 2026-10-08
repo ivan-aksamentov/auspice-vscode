@@ -17,6 +17,39 @@ declare module "@auspice/components/main" {
   export default Main
 }
 
+declare module "@auspice/components/download/helperFunctions" {
+  import type { TFunction } from "i18next"
+  import type { Dispatch } from "redux"
+
+  export function SVG(
+    dispatch: Dispatch,
+    t: TFunction,
+    metadata: unknown,
+    nodes: unknown,
+    visibility: unknown,
+    filePrefix: string,
+    panelsInDOM: readonly string[],
+    panelLayout: string,
+    publications: readonly unknown[],
+  ): void
+  export function auspiceJSON(dispatch: Dispatch, state: unknown, filePrefix: string): void
+  export function exportTree(options: {
+    readonly dispatch: Dispatch
+    readonly filePrefix: string
+    readonly tree: unknown
+    readonly isNewick: boolean
+    readonly temporal: boolean
+  }): void
+}
+
+declare module "@auspice/components/download/downloadButtons" {
+  export function getFilePrefix(): string
+}
+
+declare module "@auspice/components/download/downloadModal" {
+  export function relevantPublications(colorBy: string): readonly unknown[]
+}
+
 declare module "@auspice/actions/types" {
   export const BROWSER_DIMENSIONS: string
   export const TOGGLE_MOBILE_DISPLAY: string

@@ -67,6 +67,12 @@
   outline-offset: -1px;
 }
 
+.auspice-vscode-tree-download svg {
+  color: #888;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
 .auspice-vscode-status {
   font-size: 12px;
   margin-left: auto;

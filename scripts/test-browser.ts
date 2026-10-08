@@ -82,6 +82,11 @@ try {
   await tipLabels.page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
   assert.deepEqual(await tipLabelsPastTreePanel(tipLabels.page), [WIDE_TIP_NAME])
   assert.deepEqual(await treeLabelsOutsideSvgExport(tipLabels.page), [])
+  const downloads = await downloadsFromTreeButtons(tipLabels.page, ["SVG", "JSON", "NWK"])
+  assert.deepEqual(
+    downloads.map(({ filename }) => filename),
+    ["view.svg", "view.json", "view_tree.nwk"],
+  )
   assert.deepEqual(tipLabels.pageErrors, [])
 
 } finally {
@@ -195,6 +200,38 @@ async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
   })
 }
 
+/** Press download buttons of the tree panel and return the downloaded files */
+async function downloadsFromTreeButtons(
+  page: Page,
+  buttons: readonly string[],
+): Promise<{ filename: string; content: string }[]> {
+  await page.evaluate(() => {
+    window.treeButtonDownloads = []
+    window.addEventListener("auspice-export", (event) => {
+      const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
+      if (
+        typeof detail === "object" &&
+        detail !== null &&
+        "filename" in detail &&
+        "content" in detail
+      ) {
+        window.treeButtonDownloads?.push({
+          filename: String(detail.filename),
+          content: String(detail.content),
+        })
+      }
+    })
+  })
+  for (const [index, name] of buttons.entries()) {
+    await page.getByRole("button", { name, exact: true }).click()
+    await page.waitForFunction(
+      (count) => (window.treeButtonDownloads?.length ?? 0) >= count,
+      index + 1,
+    )
+  }
+  return page.evaluate(() => window.treeButtonDownloads ?? [])
+}
+
 async function loadDataset(page: Page, dataset: unknown, mapsEnabled: boolean): Promise<void> {
   const content = JSON.stringify(dataset)
   await page.evaluate(
@@ -232,5 +269,6 @@ declare global {
   interface Window {
     viewerMessages?: readonly unknown[]
     svgExports?: string[]
+    treeButtonDownloads?: { filename: string; content: string }[]
   }
 }

@@ -36,6 +36,16 @@ export function IconExternalLink({ size = 16 }: IconProps): React.ReactElement {
   )
 }
 
+export function IconDownload({ size = 16 }: IconProps): React.ReactElement {
+  return (
+    <Svg size={size}>
+      <path d="M8 2.5V10" />
+      <path d="M4.5 6.5 8 10 11.5 6.5" />
+      <path d="M2.5 10.5V12.5A1 1 0 0 0 3.5 13.5H12.5A1 1 0 0 0 13.5 12.5V10.5" />
+    </Svg>
+  )
+}
+
 function Svg({ size, children }: IconProps & { children: React.ReactNode }): React.ReactElement {
   return (
     <svg
