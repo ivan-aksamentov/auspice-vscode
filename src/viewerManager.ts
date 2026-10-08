@@ -22,6 +22,7 @@ import {
 
 import type { InputDiagnostic } from "./diagnostics.js"
 import { replaceDiagnostics } from "./diagnostics.js"
+import { exportFileName, exportFilters } from "./fileNames.js"
 import type { HostMessage, WebviewMessage } from "./protocol.js"
 import { webviewMessageSchema } from "./protocol.js"
 import {
@@ -397,7 +398,7 @@ function createViewerSession(
         reloadWebview()
         return
       case "saveExport":
-        await saveExport(message.filename, message.mediaType, message.content)
+        await saveExport(uri, message.filename, message.content)
         return
       case "diagnostics":
         if (message.generation !== committedGeneration) return
@@ -589,27 +590,17 @@ function createViewerSession(
   }
 }
 
-async function saveExport(
-  filename: string,
-  mediaType: string,
-  content: ArrayBuffer,
-): Promise<void> {
+// Propose the export next to the dataset, named after it
+async function saveExport(datasetUri: Uri, filename: string, content: ArrayBuffer): Promise<void> {
+  const name = exportFileName(basename(datasetUri.path), basename(filename))
   const destination = await window.showSaveDialog({
-    defaultUri: VsCodeUri.file(basename(filename)),
+    defaultUri: VsCodeUri.joinPath(datasetUri, "..", name),
     saveLabel: "Save Auspice export",
-    filters: exportFilters(mediaType),
+    filters: exportFilters(name),
   })
   if (destination !== undefined) {
     await workspace.fs.writeFile(destination, new Uint8Array(content))
   }
-}
-
-function exportFilters(mediaType: string): Record<string, string[]> {
-  if (mediaType.includes("svg")) return { "SVG image": ["svg"] }
-  if (mediaType.includes("csv")) return { "CSV table": ["csv"] }
-  if (mediaType.includes("json")) return { JSON: ["json"] }
-  if (mediaType.includes("newick")) return { "Newick tree": ["nwk", "newick"] }
-  return { "Text file": ["txt"] }
 }
 
 function mapsEnabled(uri: Uri): boolean {

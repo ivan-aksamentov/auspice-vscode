@@ -10,9 +10,14 @@ import { ViewerSplash } from "./components"
 //
 // A null navbar suppresses Auspice's built-in content and its reserved row. The
 // sidebar fold control remains available independently of the navbar content.
+//
+// Auspice names downloads after the page URL, which a webview does not have, so
+// `filePrefix` gives them a fixed name ("view.svg") that the host prefixes with
+// the dataset name in the save dialog.
 const registry: Record<string, unknown> = {
   navbarComponent: null,
   splashComponent: ViewerSplash,
+  filePrefix: "view",
   entryPage: "splash",
   browserTitle: "Auspice Tree Viewer",
   enableDatasetEditor: true,

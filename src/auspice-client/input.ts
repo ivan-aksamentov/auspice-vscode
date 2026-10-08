@@ -1,14 +1,17 @@
 import { convertFromV1 } from "auspice/cli/server/convertJsonSchemas.js"
 import { z } from "zod"
 
+import {
+  JSON_SUFFIXES,
+  NEWICK_SUFFIXES,
+  stripSuffix,
+  V1_META_SUFFIX,
+  V1_TREE_SUFFIX,
+} from "../fileNames"
 import { newickToAuspiceJson } from "./newick"
 
 const recordSchema = z.record(z.string(), z.unknown())
 const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true })
-const JSON_SUFFIXES = [".auspice.json", ".auspicejson", ".json"]
-const NEWICK_SUFFIXES = [".new", ".nwk", ".newick"]
-const V1_META_SUFFIX = "_meta.json"
-const V1_TREE_SUFFIX = "_tree.json"
 const SIDECAR_SUFFIXES = {
   tipFrequencies: "_tip-frequencies.json",
   measurements: "_measurements.json",
@@ -385,10 +388,4 @@ function concatenate(chunks: readonly Uint8Array[], byteLength: number): Uint8Ar
 
 function decodeText(resource: DecodedResource): string {
   return UTF8_DECODER.decode(resource.bytes)
-}
-
-function stripSuffix(name: string, suffixes: readonly string[]): string {
-  const lower = name.toLowerCase()
-  const suffix = suffixes.find((candidate) => lower.endsWith(candidate))
-  return suffix === undefined ? name : name.slice(0, -suffix.length)
 }
