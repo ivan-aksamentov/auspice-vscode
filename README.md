@@ -40,7 +40,7 @@ Alternatively, open the Extensions view, select **Views and More Actions...**, c
 - **Sidecars**: sibling `_tip-frequencies`, `_measurements`, and `_root-sequence` files attach automatically.
 - **Metadata**: apply CSV, TSV, XLSX, or node-data JSON to the active view.
 - **Comparison and narratives**: open a second tree in a tangle view, or render a local Markdown narrative with its referenced datasets.
-- **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels.
+- **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels. The tab on its edge folds it away and back; the tree always fills the space beside it.
 - **Downloads**: the SVG, JSON, and NWK buttons above the tree save the current view as a figure, an Auspice dataset, or a Newick tree. The save dialog proposes a file next to the dataset, named after it.
 
 Each primary dataset opens in its own tab with an independent store and file lifecycle.
@@ -80,6 +80,7 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
   "auspiceVscode.largeTreeTipAdvisory": 5000,
 
   // Show maps and let background tiles load from OpenFreeMap (tiles.openfreemap.org). Dataset files always stay local.
+  // Maps need WebGL; a window without it (e.g. with hardware acceleration disabled) hides the map and reports why.
   //   false [default]: maps off; no external tile requests
   //   true: maps on; background tiles load from OpenFreeMap
   "auspiceVscode.mapsEnabled": false,
