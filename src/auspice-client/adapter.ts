@@ -4,7 +4,7 @@ import { createStateFromQueryOrJSONs } from "@auspice/actions/recomputeReduxStat
 import store from "@auspice/store"
 
 import type { MainInput, ParsedInputs, ViewerDiagnostic } from "./input"
-import { applyMapSetting } from "./mapSetting"
+import { applyMapSetting, canDrawMaps } from "./mapSetting"
 
 export function loadIntoAuspice(
   inputs: ParsedInputs,
@@ -28,9 +28,18 @@ export function loadIntoAuspice(
       },
     ]
   }
-  const mainJson = applyMapSetting(main.json, mapsEnabled)
+  const showMaps = mapsEnabled && canDrawMaps()
+  if (mapsEnabled && !showMaps) {
+    diagnostics.push({
+      resourceIndex: main.resourceIndex,
+      severity: "warning",
+      message:
+        "Maps are enabled, but this VS Code window cannot draw them: the map needs WebGL, which is unavailable, e.g. with hardware acceleration disabled. The map panel is hidden.",
+    })
+  }
+  const mainJson = applyMapSetting(main.json, showMaps)
   const second = selectMain(inputs, 1)
-  const secondJson = second === undefined ? false : applyMapSetting(second.json, mapsEnabled)
+  const secondJson = second === undefined ? false : applyMapSetting(second.json, showMaps)
   const measurementsData = findSidecar(inputs, main, "measurements")?.json
   dispatch({
     type: "CLEAN_START",
@@ -57,7 +66,7 @@ export function loadIntoAuspice(
   dispatch({ type: "CHANGE_LANGUAGE", data: locale })
   dispatch({ type: "PAGE_CHANGE", displayComponent: "main" })
   const datasets = Object.fromEntries(
-    inputs.mains.map((input) => [input.datasetName, createDataset(input, inputs, mapsEnabled)]),
+    inputs.mains.map((input) => [input.datasetName, createDataset(input, inputs, showMaps)]),
   )
   datasets[main.datasetName]?.loadSidecars(store.dispatch)
   if (inputs.narrative !== undefined) dispatch({ type: "CACHE_JSONS", jsons: datasets })
@@ -72,13 +81,9 @@ export function loadIntoAuspice(
   return diagnostics
 }
 
-function createDataset(
-  main: MainInput,
-  inputs: ParsedInputs,
-  mapsEnabled: boolean,
-): DatasetInstance {
+function createDataset(main: MainInput, inputs: ParsedInputs, showMaps: boolean): DatasetInstance {
   const dataset = new Dataset(main.datasetName)
-  dataset.main = Promise.resolve(applyMapSetting(main.json, mapsEnabled))
+  dataset.main = Promise.resolve(applyMapSetting(main.json, showMaps))
   const tipFrequencies = inputs.sidecars.find(
     (sidecar) =>
       sidecar.datasetName === datasetName(main.datasetName) && sidecar.kind === "tipFrequencies",

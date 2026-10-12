@@ -521,6 +521,43 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  {
+    name: "draws the map when maps are on",
+    async run() {
+      const { page, pageErrors } = await openViewer(contractDataset, { maps: true })
+      // Tile requests leave the test page and are aborted; the map itself still renders
+      await page.locator(".leaflet-container canvas").first().waitFor()
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "hides the map and reports why when the window has no WebGL",
+    async run() {
+      const { page, pageErrors } = await openViewer(contractDataset, { maps: true, webgl: false })
+      await page.locator("#MainTree .tip").first().waitFor()
+      assert.equal(await page.locator(".leaflet-container").count(), 0)
+      assert.equal(await page.getByText("Something's gone wrong within the map panel").count(), 0)
+      const warnings = await page.evaluate(() =>
+        (window.viewerMessages ?? []).flatMap((message) =>
+          typeof message === "object" &&
+          message !== null &&
+          "type" in message &&
+          message.type === "diagnostics" &&
+          "diagnostics" in message &&
+          Array.isArray(message.diagnostics)
+            ? message.diagnostics.map(
+                (diagnostic: { readonly message?: string }) => diagnostic.message,
+              )
+            : [],
+        ),
+      )
+      assert.ok(
+        warnings.some((warning) => warning?.includes("the map needs WebGL") === true),
+        `diagnostics: ${JSON.stringify(warnings)}`,
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {
@@ -557,9 +594,22 @@ async function openViewer(
     secondDataset,
     files = [],
     sidebar = "open",
+    maps = false,
+    webgl = true,
   }: ViewerOptions = {},
 ): Promise<OpenViewer> {
   const page = await browser.newPage({ viewport })
+  if (!webgl) {
+    // A VS Code window without hardware acceleration may have no WebGL context at all
+    await page.addInitScript({
+      content: `{
+        const getContext = HTMLCanvasElement.prototype.getContext
+        HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+          return type === "webgl" || type === "webgl2" ? null : getContext.call(this, type, ...rest)
+        }
+      }`,
+    })
+  }
   const pageErrors: string[] = []
   const consoleTimers: string[] = []
   page.on("pageerror", (error) => pageErrors.push(error.message))
@@ -587,7 +637,7 @@ async function openViewer(
       : [{ name: "second.auspice.json", text: JSON.stringify(secondDataset) }]),
     ...files,
   ]
-  await loadFiles(page, resources, sidebar)
+  await loadFiles(page, resources, { sidebar, maps })
   return { page, pageErrors, consoleTimers }
 }
 
@@ -603,6 +653,10 @@ interface ViewerOptions {
   /** Further input files, e.g. a narrative and its datasets */
   readonly files?: readonly ViewerFile[]
   readonly sidebar?: "open" | "closed"
+  /** The `mapsEnabled` setting */
+  readonly maps?: boolean
+  /** Whether the browser provides WebGL */
+  readonly webgl?: boolean
 }
 
 interface ViewerFile {
@@ -823,10 +877,10 @@ async function downloadsFromTreeButtons(
 async function loadFiles(
   page: Page,
   files: readonly ViewerFile[],
-  sidebar: "open" | "closed",
+  { sidebar, maps }: { readonly sidebar: "open" | "closed"; readonly maps: boolean },
 ): Promise<void> {
   await page.evaluate(
-    ({ inputFiles, sidebarInitialState }) => {
+    ({ inputFiles, sidebarInitialState, mapsEnabled }) => {
       const resources = inputFiles.map(({ name, text }) => ({
         uri: `file:///${name}`,
         name,
@@ -839,14 +893,14 @@ async function loadFiles(
           resources,
           resourceLimitBytes: 1_000_000,
           largeTreeTipAdvisory: 0,
-          mapsEnabled: false,
+          mapsEnabled,
           sidebarInitialState,
           locale: "en",
         },
         "*",
       )
     },
-    { inputFiles: files, sidebarInitialState: sidebar },
+    { inputFiles: files, sidebarInitialState: sidebar, mapsEnabled: maps },
   )
   await page.waitForFunction(
     () =>
