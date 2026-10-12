@@ -10,6 +10,109 @@ index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2
 diff --git a/node_modules/auspice/.bun-tag-33dd6a5242cfeb13 b/.bun-tag-33dd6a5242cfeb13
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/auspice/.bun-tag-cb89d3964373411e b/.bun-tag-cb89d3964373411e
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/src/components/controls/choose-branch-labelling.js b/src/components/controls/choose-branch-labelling.js
+index 36539c4b270cc1d7adc9cb75fde901eefdd3bf75..440254a6a7c5a2602aab7b2da501a7604bc47d38 100644
+--- a/src/components/controls/choose-branch-labelling.js
++++ b/src/components/controls/choose-branch-labelling.js
+@@ -33,6 +33,7 @@ class ChooseBranchLabelling extends React.Component {
+         </SidebarSubtitle>
+         <div style={{width: controlsWidth, fontSize: 14}}>
+           <CustomSelect
++            aria-label={t("sidebar:Branch Labels")}
+             value={selectOptions.filter(({value}) => value === this.props.selected)}
+             options={selectOptions}
+             isClearable={false}
+diff --git a/src/components/controls/choose-explode-attr.js b/src/components/controls/choose-explode-attr.js
+index ab53f83d52bf3b11208bdfd85aeb6d8b67912119..21b156765dccb1f8c566e107fabc54447e3d27f7 100644
+--- a/src/components/controls/choose-explode-attr.js
++++ b/src/components/controls/choose-explode-attr.js
+@@ -60,6 +60,7 @@ class ChooseExplodeAttr extends React.Component {
+         </SidebarSubtitleFlex>
+         <div style={{width: controlsWidth, fontSize: 14}}>
+           <CustomSelect
++            aria-label={t("sidebar:Explode Tree By")}
+             value={selectOptions.filter(({value}) => value === this.props.selected)}
+             options={selectOptions}
+             isClearable={false}
+diff --git a/src/components/controls/choose-layout.js b/src/components/controls/choose-layout.js
+index abdf85bf6f8ff256def86374262470df7b92d6de..993c9d6dc6c4724f324f41e1dff06640e97c4bda 100644
+--- a/src/components/controls/choose-layout.js
++++ b/src/components/controls/choose-layout.js
+@@ -81,6 +81,7 @@ class ChooseLayout extends React.Component {
+           <ScatterSelectContainer>
+             <CustomSelect
+               {...miscSelectProps}
++              aria-label="X axis"
+               value={options.filter(({value}) => value === selectedX.value)}
+               onChange={(value) => this.props.dispatch(changeLayout({x: value.value, xLabel: value.label}))}
+             />
+@@ -92,6 +93,7 @@ class ChooseLayout extends React.Component {
+           <ScatterSelectContainer>
+             <CustomSelect
+               {...miscSelectProps}
++              aria-label="Y axis"
+               value={options.filter(({value}) => value === selectedY.value)}
+               onChange={(value) => this.props.dispatch(changeLayout({y: value.value, yLabel: value.label}))}
+             />
+diff --git a/src/components/controls/choose-second-tree.js b/src/components/controls/choose-second-tree.js
+index c2df098873bcf1b109cb6b6aa9c2e02939396e15..7170847e7ea81511c8878ec3c4e0be493a4887ef 100644
+--- a/src/components/controls/choose-second-tree.js
++++ b/src/components/controls/choose-second-tree.js
+@@ -52,6 +52,7 @@ class ChooseSecondTree extends React.Component {
+         <div key={"treetooselect"} style={{width: controlsWidth, fontSize: 14}}>
+           <CustomSelect
+             name="selectTreeToo"
++            aria-label={t("sidebar:Second Tree")}
+             id="selectTreeToo"
+             value={selectOptions.filter(({value}) => value === this.props.showTreeToo)}
+             options={selectOptions}
+diff --git a/src/components/controls/choose-stream-trees.tsx b/src/components/controls/choose-stream-trees.tsx
+index ae2341db0f4b58db5ebdd5504c92f5a722df81de..a1359389c57f723194a2640df89977c380f077a4 100644
+--- a/src/components/controls/choose-stream-trees.tsx
++++ b/src/components/controls/choose-stream-trees.tsx
+@@ -60,6 +60,7 @@ export const ChooseStreamTrees = (): JSX.Element => {
+           </SidebarSubtitleFlex>
+           <div style={{width: controlsWidth, fontSize: 14}}>
+             <CustomSelect
++              aria-label={t("sidebar:Stream-tree branch label")}
+               value={selectOptions.filter(({value}) => value === streamTreeBranchLabel)}
+               options={selectOptions}
+               isClearable={false}
+diff --git a/src/components/controls/choose-tip-label.js b/src/components/controls/choose-tip-label.js
+index 1d17b09803a9c486dc6902b4a07456c54668b390..a652e73d38d6e645d03c73bc1c579fbd9d73add3 100644
+--- a/src/components/controls/choose-tip-label.js
++++ b/src/components/controls/choose-tip-label.js
+@@ -24,6 +24,7 @@ class ChooseTipLabel extends React.Component {
+         </SidebarSubtitle>
+         <div style={{width: controlsWidth, fontSize: 14}}>
+           <CustomSelect
++            aria-label={t("sidebar:Tip Labels")}
+             value={this.props.options.filter(({value}) => value === this.props.selected)}
+             // Select can't handle Symbols, so we have to convert to string for them
+             getOptionValue={(option) => option.value.toString()}
+diff --git a/src/components/controls/color-by.js b/src/components/controls/color-by.js
+index 6aa6e9373acfdc3880c70bb90c622dbd3dd83b83..428379632d2ee49b3839aef624bc5011433e18b1 100644
+--- a/src/components/controls/color-by.js
++++ b/src/components/controls/color-by.js
+@@ -156,6 +156,7 @@ class ColorBy extends React.Component {
+       <CustomSelect
+         name="selectGenotype"
+         id="selectGenotype"
++        aria-label="Gene"
+         placeholder="gene…"
+         value={gtGeneOptions.filter(({value}) => value === this.state.geneSelected)}
+         options={gtGeneOptions}
+@@ -214,6 +215,7 @@ class ColorBy extends React.Component {
+       <div style={styles.base} id="selectColorBy">
+         <CustomSelect
+           name="selectColorBy"
++          aria-label="Color By"
+           value={colorOptions.filter(({value}) => value === this.state.colorBySelected)}
+           options={colorOptions}
+           isClearable={false}
 diff --git a/src/components/controls/customSelect.js b/src/components/controls/customSelect.js
 index 37f6259398a3ffc42451f4e702956adefb181381..061eb5fa5608c8264488ff907ab39824888995ce 100644
 --- a/src/components/controls/customSelect.js
@@ -34,6 +137,144 @@ index 37f6259398a3ffc42451f4e702956adefb181381..061eb5fa5608c8264488ff907ab39824
  };
  
  const CustomSelect = (props) => {
+diff --git a/src/components/controls/filter.js b/src/components/controls/filter.js
+index 3c3f9069abfbde12b762b1261c395ddc54e0064f..ee157e29e1e395e41f4d16aef4b8f28aee5e8484 100644
+--- a/src/components/controls/filter.js
++++ b/src/components/controls/filter.js
+@@ -202,6 +202,7 @@ class FilterData extends React.Component {
+       <div style={styles.base} key={divKey}>
+         <AsyncSelect
+           name="filterQueryBox"
++          aria-label="Filter Data"
+           placeholder="Type filter query here..."
+           value={null}
+           defaultOptions
+diff --git a/src/components/controls/geo-resolution.js b/src/components/controls/geo-resolution.js
+index 375464377679a53e4fb80c75f71f1bd623786bc8..d282bbf9cabfdf39faacec6b82f2ac02f600a384 100644
+--- a/src/components/controls/geo-resolution.js
++++ b/src/components/controls/geo-resolution.js
+@@ -35,6 +35,7 @@ class GeoResolution extends React.Component {
+         <div style={{marginBottom: 10, width: controlsWidth, fontSize: 14}}>
+           <CustomSelect
+             name="selectGeoResolution"
++            aria-label={t("sidebar:Geographic resolution")}
+             id="selectGeoResolution"
+             value={geoResolutionOptions.filter(({value}) => value === this.props.geoResolution)}
+             options={geoResolutionOptions}
+diff --git a/src/components/controls/language.js b/src/components/controls/language.js
+index e89a72f26e8c90713fa2d730a792e8d7b57d6f68..3fdde1f681792b561c1a339dec08c26b9f3268cf 100644
+--- a/src/components/controls/language.js
++++ b/src/components/controls/language.js
+@@ -64,6 +64,7 @@ class Language extends React.Component {
+       <div style={{paddingBottom: 100, width: controlsWidth, fontSize: 14}}>
+         <CustomSelect
+           name="selectLanguage"
++          aria-label="Language"
+           id="selectLanguage"
+           value={selectOptions.filter(({value}) => value === this.props.language)}
+           options={selectOptions}
+diff --git a/src/components/controls/measurementsOptions.tsx b/src/components/controls/measurementsOptions.tsx
+index b31600603484b7cb6cabfdd09f1f5ec3146f7208..b50a0b22a317d26b62b501ef8c2515f798b966d7 100644
+--- a/src/components/controls/measurementsOptions.tsx
++++ b/src/components/controls/measurementsOptions.tsx
+@@ -65,6 +65,7 @@ const MeasurementsOptions = (): JSX.Element => {
+       <div style={{ marginBottom: 10, width: controlsWidth, fontSize: 14}}>
+         <CustomSelect
+           name="measurementsCollections"
++          aria-label="Collections"
+           id="measurementsCollections"
+           value={collectionOptions.filter(({value}) => value === collection.key)}
+           options={collectionOptions}
+@@ -82,6 +83,7 @@ const MeasurementsOptions = (): JSX.Element => {
+       <div style={{ marginBottom: 10, width: controlsWidth, fontSize: 14}}>
+         <CustomSelect
+           name="measurementsGroupings"
++          aria-label="Group By"
+           id="measurementsGroupings"
+           value={groupingOptions.filter(({value}) => value === groupBy)}
+           options={groupingOptions}
+diff --git a/src/components/controls/panelHeader.tsx b/src/components/controls/panelHeader.tsx
+index 42a8effb51dcff822e7a5399a2372c05ad3de0e2..8e5ef846efcb5a79c6d1e06aca3de568f7a38b5e 100644
+--- a/src/components/controls/panelHeader.tsx
++++ b/src/components/controls/panelHeader.tsx
+@@ -41,9 +41,21 @@ export const PanelHeader = ({ panel, title, tooltip, panelIsVisible, hasOptions,
+     setOptionsAreVisible(!optionsAreVisible);
+   }
+ 
++  /* expand and collapse the options on Enter and Space too, as a native button does */
++  function toggleOptionsVisibilityByKey(event: React.KeyboardEvent): void {
++    if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
++    event.preventDefault();
++    toggleOptionsVisibility();
++  }
++
+   return (
+     <HeaderContainer {...(hasOptions ? {
+                             onClick: toggleOptionsVisibility,
++                            onKeyDown: toggleOptionsVisibilityByKey,
++                            role: "button",
++                            tabIndex: 0,
++                            "aria-expanded": optionsAreVisible,
++                            "aria-label": `${title} options`,
+                             style: {cursor: "pointer"}
+                           } :
+                           {} )}>
+@@ -62,7 +74,8 @@ export const PanelHeader = ({ panel, title, tooltip, panelIsVisible, hasOptions,
+           display={true}
+           on={panelIsVisible}
+           callback={togglePanelVisibility}
+-          label="" />
++          label=""
++          ariaLabel={`Show ${title} panel`} />
+       </span>
+     </HeaderContainer>
+   );
+diff --git a/src/components/controls/toggle.js b/src/components/controls/toggle.js
+index a73fe7bf478e18e97a194de0243718e9d2cb53bf..bd154235640951c5f8e67feaf8075f0edf39ff0d 100644
+--- a/src/components/controls/toggle.js
++++ b/src/components/controls/toggle.js
+@@ -14,8 +14,14 @@ const ToggleBackground = styled.label`
+   display: inline-block;
+   width: 35px;
+   height: 21px;
++  /* hidden, but in its place and focusable, so the keyboard reaches the toggle */
+   input {
+-    display: none;
++    position: absolute;
++    inset: 0;
++    width: 100%;
++    height: 100%;
++    opacity: 0;
++    margin: 0;
+   }
+ 
+   input:checked {
+@@ -80,10 +86,15 @@ const Input = styled.input`
+   &:focus {
+     box-shadow: 0 0 1px #2196F3;
+   }
++  &:focus-visible + ${Slider} {
++    outline: 2px solid ${(props) => props.theme.selectedColor};
++    outline-offset: 2px;
++  }
+ `;
+ 
+ 
+-const Toggle = ({display, isExperimental = false, on, callback, label, style={}, disabled = false}) => {
++/* `ariaLabel` names a toggle without a visible label for assistive technology */
++const Toggle = ({display, isExperimental = false, on, callback, label, ariaLabel = undefined, style={}, disabled = false}) => {
+   if (!display) return null;
+ 
+   return (
+@@ -94,7 +105,7 @@ const Toggle = ({display, isExperimental = false, on, callback, label, style={},
+         </ExperimentalIcon>
+       }
+       <ToggleBackground>
+-        <Input type="checkbox" checked={on} onChange={disabled ? () => {} : callback}/>
++        <Input type="checkbox" checked={on} aria-label={ariaLabel} aria-disabled={disabled || undefined} onChange={disabled ? () => {} : callback}/>
+         <Slider disabled={disabled}/>
+         {label === "" ? null : (
+           <ToggleSubtitle>
 diff --git a/src/components/download/downloadButtons.js b/src/components/download/downloadButtons.js
 index e07b57c5760fca3edac1ddd04893051b1ff7f6a6..65b435b166e063053a2b4a10127d389b1e3d1f55 100644
 --- a/src/components/download/downloadButtons.js
@@ -378,6 +619,47 @@ index 33da38f8012b102c00030b75d244f3ba424728cb..ebc5c5235596bc80c4a9767fefe061db
    return null;
  }
  
+diff --git a/src/components/info/filterBadge.js b/src/components/info/filterBadge.js
+index 5c1e69c62ab2328fd2c5ca71e17bc951bd724101..7a76b88e3a29fce33b8074dd27d358171daadb9d 100644
+--- a/src/components/info/filterBadge.js
++++ b/src/components/info/filterBadge.js
+@@ -92,11 +92,21 @@ export const Tooltip = ({id, children}) => (
+ );
+ 
+ 
++/* run the action of a badge button on Enter and Space too, as a native button does */
++const onButtonKey = (action) => (event) => {
++  if (event.key === "Enter" || event.key === " ") {
++    event.preventDefault();
++    action();
++  }
++};
++
+ /**
+  * React component to display a selected filter with associated
+  * icons to remove filter. More functionality to be added!
+  */
+ export const FilterBadge = ({remove, canMakeInactive, active, activate, inactivate, children, id, onHoverMessage="The visible data is being filtered by this"}) => {
++  /* the badge buttons are icons, so they are named after the filter value for assistive technology */
++  const name = typeof children === "string" ? children : id;
+   return (
+     <BadgeContainer striped={canMakeInactive && !active}>
+       <TextContainer active={canMakeInactive ? active : true} data-tip data-for={id}>
+@@ -106,12 +116,12 @@ export const FilterBadge = ({remove, canMakeInactive, active, activate, inactiva
+         {canMakeInactive && !active ? `This filter is currently inactive` : onHoverMessage}
+       </Tooltip>
+       {canMakeInactive && (
+-        <IconContainer onClick={active ? inactivate : activate} role="button" tabIndex={0} data-tip data-for={id+'active'}>
++        <IconContainer onClick={active ? inactivate : activate} onKeyDown={onButtonKey(active ? inactivate : activate)} role="button" tabIndex={0} aria-label={`${active ? "Hide" : "Show"} filter ${name}`} data-tip data-for={id+'active'}>
+           {active ? <FaRegEye/> : <FaRegEyeSlash/>}
+           <Tooltip id={id+'active'}>{active ? 'Inactivate this filter' : 'Re-activate this filter'}</Tooltip>
+         </IconContainer>
+       )}
+-      <IconContainer onClick={remove} role="button" tabIndex={0}>
++      <IconContainer onClick={remove} onKeyDown={onButtonKey(remove)} role="button" tabIndex={0} aria-label={`Remove filter ${name}`}>
+         <FaTrash data-tip data-for={id+'remove'}/>
+         <Tooltip id={id+'remove'}>{'Remove this filter'}</Tooltip>
+       </IconContainer>
 diff --git a/src/components/main/sidebar.tsx b/src/components/main/sidebar.tsx
 index 551be751d37c879f4f849d3392efb8cb655ad309..32766644a25c314c9201bd9b95199377073fe242 100644
 --- a/src/components/main/sidebar.tsx

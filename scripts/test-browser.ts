@@ -250,6 +250,42 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  {
+    name: "switches branch labels and panel options by keyboard",
+    async run() {
+      const { page, pageErrors } = await openViewer({
+        ...branchLabelDataset,
+        meta: { ...branchLabelDataset.meta, display_defaults: { branch_label: "none" } },
+      })
+      const branchLabels = page.getByRole("combobox", { name: "Branch Labels" })
+      await branchLabels.focus()
+      await page.keyboard.press("ArrowDown")
+      await page.getByRole("option", { name: "clade", exact: true }).waitFor()
+      await page.keyboard.press("ArrowDown")
+      await page.keyboard.press("Enter")
+      await page.locator("#MainTree .branchLabel").getByText(ROOT_BRANCH_LABEL).waitFor()
+      // The new labels widen the margin on the root side, which moves the whole tree
+      assert.deepEqual(await treeLabelsOutsideTreeSvg(page), [])
+
+      const showAllLabels = page.getByRole("checkbox", { name: "Show all labels" })
+      await showAllLabels.focus()
+      await page.keyboard.press("Space")
+      assert.equal(await showAllLabels.isChecked(), true)
+
+      const treeOptions = page.getByRole("button", { name: "Tree options" })
+      assert.equal(await treeOptions.getAttribute("aria-expanded"), "true")
+      await treeOptions.focus()
+      await page.keyboard.press("Enter")
+      assert.equal(await treeOptions.getAttribute("aria-expanded"), "false")
+      await branchLabels.waitFor({ state: "detached" })
+
+      const treePanel = page.getByRole("checkbox", { name: "Show Tree panel" })
+      await treePanel.focus()
+      await page.keyboard.press("Space")
+      await page.locator("#MainTree").waitFor({ state: "detached" })
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {
