@@ -435,6 +435,39 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  {
+    name: "keeps the tree buttons clear of the tree card title in a narrow panel area",
+    async run() {
+      // With the sidebar open, a 700 px viewer leaves the tree card too narrow for its buttons in
+      // one row
+      const { page, pageErrors } = await openViewer(tipLabelDataset, {
+        viewport: { width: 700, height: 520 },
+      })
+      await page.locator("#MainTree .tip").first().waitFor()
+      const overlaps = await page.evaluate(() => {
+        const card = document.getElementById("MainTree")?.closest("[id$=Card]")
+        const title = card?.querySelector("#CardTitle")
+        if (title === null || title === undefined) return ["(no card title)"]
+        const range = document.createRange()
+        range.selectNodeContents(title)
+        const text = range.getBoundingClientRect()
+        return [...(card?.querySelectorAll("button") ?? [])]
+          .filter((button) => {
+            const box = button.getBoundingClientRect()
+            return (
+              box.width > 0 &&
+              box.left < text.right &&
+              box.right > text.left &&
+              box.top < text.bottom &&
+              box.bottom > text.top
+            )
+          })
+          .map((button) => button.textContent ?? "")
+      })
+      assert.deepEqual(overlaps, [])
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {

@@ -316,3 +316,23 @@
     transform: rotate(360deg);
   }
 }
+
+/*
+ * Auspice sizes the dataset title of the info header for a browser window (24-28 px). In an editor
+ * tab, 18-22 px keeps the title above the byline in the hierarchy and leaves more height to the
+ * tree. The title is the first of the header lines, which Auspice marks with a `width` attribute.
+ */
+.auspice-vscode-panel-header #CardContentContainer > div > :nth-child(1 of [width]) {
+  font-size: clamp(18px, 1vw + 12px, 22px) !important;
+}
+
+/*
+ * The download buttons and Auspice's zoom buttons hang from the top of the tree card. A narrow
+ * card needs more than one row for them: wrap them towards the right, clear of the card title.
+ */
+.auspice-vscode-panels-scroll div:has(> .auspice-vscode-tree-download) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: calc(100% - 100px);
+}
