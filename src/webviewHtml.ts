@@ -25,11 +25,17 @@ export function renderWebviewHtml(options: WebviewHtmlOptions): string {
     <title>Auspice</title>
     <link rel="icon" href="${options.assets.favicon}" type="image/png">
     <style>
+      /*
+       * VS Code's default webview styles pad the body by 20 px on the left and
+       * right (the \`vscode-default\` layer), which framed the viewer in a strip
+       * of editor background. The viewer fills the whole editor.
+       */
       html,
       body,
       #root {
         height: 100%;
         margin: 0;
+        padding: 0;
       }
 
       /*

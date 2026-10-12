@@ -51,6 +51,20 @@ describe("webview contract", () => {
     expect(actual).toContain("img-src vscode-webview: data: blob: https://tiles.openfreemap.org;")
   })
 
+  test("test_webview_html_fills_the_editor_without_the_default_body_padding", () => {
+    const actual = renderWebviewHtml({
+      assets: testAssets,
+      cspSource: "vscode-webview:",
+      mapsEnabled: false,
+      nonce: "test-nonce",
+      viewerScale: 1,
+    })
+
+    // Oracle: VS Code's webview host styles `body { padding: 0 20px }` in the `vscode-default`
+    // cascade layer (workbench/contrib/webview/browser/pre/index.html), which unlayered rules override
+    expect(actual).toMatch(/body,\s*#root \{[^}]*padding: 0;/u)
+  })
+
   test("test_webview_html_injects_viewer_scale_to_counteract_editor_zoom", () => {
     const actual = renderWebviewHtml({
       assets: testAssets,
