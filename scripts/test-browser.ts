@@ -73,6 +73,19 @@ const entropyDataset = {
     ],
   },
 }
+// A time tree whose tip names are long enough to leave little room for the time axis
+const timeTreeDataset = {
+  version: "v2",
+  meta: { title: "Narrow time axis", panels: ["tree"] },
+  tree: {
+    name: "root",
+    node_attrs: { num_date: { value: 2000 }, div: 0 },
+    children: [
+      { name: LONG_TIP_NAME, node_attrs: { num_date: { value: 2020 }, div: 1 } },
+      { name: `${LONG_TIP_NAME}_B`, node_attrs: { num_date: { value: 2010 }, div: 1 } },
+    ],
+  },
+}
 const extensionRoot = resolve(import.meta.dirname, "..")
 const bundle = Bun.file(resolve(extensionRoot, "dist", "auspice-client", CLIENT_BUNDLE_FILE))
 const browserPath =
@@ -100,33 +113,77 @@ const server = Bun.serve({
   },
 })
 const browser = await chromium.launch({ executablePath: browserPath, headless: true })
+const scenarios: readonly Scenario[] = [
+  {
+    name: "renders the controls and leaves out the map while maps are off",
+    async run() {
+      const { page, pageErrors, consoleTimers } = await openViewer(contractDataset)
+      await page.getByText("Color By", { exact: true }).waitFor()
+      await page.locator('button[data-for="EditButton"]').waitFor()
+      assert.equal(await page.locator(".leaflet-container").count(), 0)
+      assert.deepEqual(pageErrors, [])
+      assert.deepEqual(consoleTimers, [])
+    },
+  },
+  {
+    name: "keeps long tip labels in the SVG export and names the downloads",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset)
+      await page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
+      assert.deepEqual(await tipLabelsPastTreePanel(page), [WIDE_TIP_NAME])
+      assert.deepEqual(await treeLabelsOutsideSvgExport(page), [])
+      const downloads = await downloadsFromTreeButtons(page, ["SVG", "JSON", "NWK"])
+      assert.deepEqual(
+        downloads.map(({ filename }) => filename),
+        ["view.svg", "view.json", "view_tree.nwk"],
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "exports the genetic diversity bars of a panel below the fold",
+    async run() {
+      const { page, pageErrors } = await openViewer(entropyDataset)
+      await page.locator("#d3entropyParent").waitFor()
+      await zoomIntoClade(page, "AB")
+      await page.locator("#d3entropyParent").getByText("data loading").waitFor()
+      assert.equal(await page.locator("#d3entropyParent").getByText("data loading").count(), 1)
+      const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+      assert.equal(svgExport?.content.includes('<svg id="entropy"'), true)
+      assert.equal(svgExport?.content.includes("data loading"), false)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "draws the date grid of a time tree narrower than one grid interval",
+    async run() {
+      // Long tip names leave the time axis of a narrow tree panel shorter than the minimum
+      // spacing of date grid lines (130 px). Auspice then divided the time range by zero grid
+      // intervals and stepped towards an unreachable date, which froze the page.
+      const { page, pageErrors } = await openViewer(timeTreeDataset, {
+        viewport: { width: 560, height: 600 },
+      })
+      await page.locator("#MainTree .tipLabel").getByText(LONG_TIP_NAME, { exact: true }).waitFor()
+      const axisWidth = await page.evaluate(() => {
+        const tips = [...document.querySelectorAll("#MainTree .tip")].map(
+          (tip) => tip.getBoundingClientRect().left,
+        )
+        return Math.max(...tips) - Math.min(...tips)
+      })
+      assert.ok(axisWidth < 130, `time axis is ${axisWidth} px wide`)
+      assert.ok((await page.locator("#MainTree .gridText").count()) > 0)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+]
 try {
-  const { page, pageErrors } = await openViewer(contractDataset)
-  await page.getByText("Color By", { exact: true }).waitFor()
-  await page.locator('button[data-for="EditButton"]').waitFor()
-  assert.equal(await page.locator(".mapboxgl-map").count(), 0)
-  assert.deepEqual(pageErrors, [])
-
-  const tipLabels = await openViewer(tipLabelDataset)
-  await tipLabels.page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
-  assert.deepEqual(await tipLabelsPastTreePanel(tipLabels.page), [WIDE_TIP_NAME])
-  assert.deepEqual(await treeLabelsOutsideSvgExport(tipLabels.page), [])
-  const downloads = await downloadsFromTreeButtons(tipLabels.page, ["SVG", "JSON", "NWK"])
-  assert.deepEqual(
-    downloads.map(({ filename }) => filename),
-    ["view.svg", "view.json", "view_tree.nwk"],
-  )
-  assert.deepEqual(tipLabels.pageErrors, [])
-
-  const entropy = await openViewer(entropyDataset)
-  await entropy.page.locator("#d3entropyParent").waitFor()
-  await zoomIntoClade(entropy.page, "AB")
-  await entropy.page.locator("#d3entropyParent").getByText("data loading").waitFor()
-  assert.equal(await entropy.page.locator("#d3entropyParent").getByText("data loading").count(), 1)
-  const [svgExport] = await downloadsFromTreeButtons(entropy.page, ["SVG"])
-  assert.equal(svgExport?.content.includes('<svg id="entropy"'), true)
-  assert.equal(svgExport?.content.includes("data loading"), false)
-  assert.deepEqual(entropy.pageErrors, [])
+  for (const scenario of scenarios) {
+    try {
+      await scenario.run()
+    } catch (error: unknown) {
+      throw new Error(`Browser scenario failed: ${scenario.name}`, { cause: error })
+    }
+  }
 } finally {
   await browser.close()
   await server.stop(true)
@@ -147,10 +204,17 @@ function browserHtml(): string {
 </html>`
 }
 
-async function openViewer(dataset: unknown): Promise<{ page: Page; pageErrors: string[] }> {
-  const page = await browser.newPage({ viewport: { width: 1_400, height: 900 } })
+async function openViewer(
+  dataset: unknown,
+  { viewport = { width: 1_400, height: 900 } }: ViewerOptions = {},
+): Promise<OpenViewer> {
+  const page = await browser.newPage({ viewport })
   const pageErrors: string[] = []
+  const consoleTimers: string[] = []
   page.on("pageerror", (error) => pageErrors.push(error.message))
+  page.on("console", (message) => {
+    if (message.text().startsWith("Timer ")) consoleTimers.push(message.text())
+  })
   await page.route("**/*", async (route) => {
     const requestUrl = new URL(route.request().url())
     await (requestUrl.origin === server.url.origin ? route.continue() : route.abort())
@@ -164,7 +228,22 @@ async function openViewer(dataset: unknown): Promise<{ page: Page; pageErrors: s
       ) === true,
   )
   await loadDataset(page, dataset, false)
-  return { page, pageErrors }
+  return { page, pageErrors, consoleTimers }
+}
+
+interface Scenario {
+  readonly name: string
+  run(): Promise<void>
+}
+
+interface ViewerOptions {
+  readonly viewport?: { readonly width: number; readonly height: number }
+}
+
+interface OpenViewer {
+  readonly page: Page
+  readonly pageErrors: string[]
+  readonly consoleTimers: string[]
 }
 
 /** Return the tip labels that extend past the right edge of the tree panel on screen */
