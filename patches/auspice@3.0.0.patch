@@ -1,6 +1,9 @@
 diff --git a/node_modules/auspice/.bun-tag-1a0c3742c35d94b3 b/.bun-tag-1a0c3742c35d94b3
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/auspice/.bun-tag-33dd6a5242cfeb13 b/.bun-tag-33dd6a5242cfeb13
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/src/components/controls/customSelect.js b/src/components/controls/customSelect.js
 index 37f6259398a3ffc42451f4e702956adefb181381..061eb5fa5608c8264488ff907ab39824888995ce 100644
 --- a/src/components/controls/customSelect.js
@@ -415,10 +418,38 @@ index 02d4e40962570749f03200e9c2a3a474414bbd23..36ed0afa5716f69495b7a79402f8bf8e
      <NavBarContainer>
        <Content
 diff --git a/src/components/tree/phyloTree/change.ts b/src/components/tree/phyloTree/change.ts
-index 3a876916302dbb571155123e5de75246d317bde3..911bb2cc1f89c896b22ed28d3517649cc2505f8f 100644
+index 3a876916302dbb571155123e5de75246d317bde3..8cd81956b9acefb11c30761fd8141c60f804722e 100644
 --- a/src/components/tree/phyloTree/change.ts
 +++ b/src/components/tree/phyloTree/change.ts
-@@ -378,7 +378,7 @@ export const change = function change(
+@@ -244,6 +244,7 @@ export const modifySVGInStages = function modifySVGInStages(
+   let inProgress = 0; /* counter of transitions currently in progress */
+ 
+   const step3 = (): void => {
++    if (this.disposed) return;
+     this.drawBranches();
+     if (this.params.showGrid) this.addGrid();
+     this.svg.selectAll(".tip").remove();
+@@ -260,6 +261,7 @@ export const modifySVGInStages = function modifySVGInStages(
+ 
+   /* STEP 2: move tips */
+   const step2 = (): void => {
++    if (this.disposed) return;
+     if (!--inProgress) { /* decrement counter. When hits 0 run block */
+       this.setClipMask();
+       const updateTips = createUpdateCall(".tip", svgPropsToUpdate);
+@@ -343,6 +345,11 @@ export const change = function change(
+   if ((Date.now() - this.timeLastRenderRequested) < idealTransitionTime * 2 || performanceFlags.get("skipTreeAnimation")===true) {
+     transitionTime = 0;
+   }
++  /* the SVG takes its new size at once, so a transition would start from positions computed for the old size and
++  draw the tree misplaced until it ends */
++  if (svgHasChangedDimensions) {
++    transitionTime = 0;
++  }
+ 
+   /* the logic of converting what react is telling us to change
+   and what SVG elements, node properties, svg props we actually change */
+@@ -378,7 +385,7 @@ export const change = function change(
      svgPropsToUpdate.add("stroke-width");
      nodePropsToModify["stroke-width"] = branchThickness;
    }
@@ -427,7 +458,7 @@ index 3a876916302dbb571155123e5de75246d317bde3..911bb2cc1f89c896b22ed28d3517649c
      elemsToUpdate.add(".tip").add(".branch.S").add(".branch.T").add(".branch");
      elemsToUpdate.add(".vaccineCross").add(".vaccineDottedLine").add(".conf");
      elemsToUpdate.add('.branchLabel').add('.tipLabel');
-@@ -398,7 +398,10 @@ export const change = function change(
+@@ -398,7 +405,10 @@ export const change = function change(
      }
  
  
@@ -439,7 +470,7 @@ index 3a876916302dbb571155123e5de75246d317bde3..911bb2cc1f89c896b22ed28d3517649c
    if (newTipLabelKey) {
      this.callbacks.tipLabel = makeTipLabelFunc(newTipLabelKey);
      elemsToUpdate.add('.tipLabel'); /* will trigger d3 commands as required */
-@@ -430,7 +433,7 @@ export const change = function change(
+@@ -430,7 +440,7 @@ export const change = function change(
        zoomIntoClade.n.parent.shell;
      applyToChildren(this.zoomNode, (d: PhyloNode) => {d.inView = true;});
    }
@@ -448,7 +479,7 @@ index 3a876916302dbb571155123e5de75246d317bde3..911bb2cc1f89c896b22ed28d3517649c
      this.nodes.forEach((d) => {d.update = true;});
    }
  
-@@ -468,7 +471,8 @@ export const change = function change(
+@@ -468,7 +478,8 @@ export const change = function change(
      svgHasChangedDimensions ||
      streamDefinitionChange ||
      changeVisibility ||
@@ -473,6 +504,18 @@ index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..8c34be4a2f8c79ce5cae7c9dc73177c4
    const levels = {
      CENTURY: {t: 100, max: undefined},
      DECADE: {t: 10, max: 5}, // i.e. spacing of 50 years is ok, but 60 jumps up to 100y spacing
+diff --git a/src/components/tree/phyloTree/labels.js b/src/components/tree/phyloTree/labels.js
+index d37f293a1be1dadb39303d4430cb4e0b3b50331c..063867d54d348390314113fde6e2f5da4ce1e68f 100644
+--- a/src/components/tree/phyloTree/labels.js
++++ b/src/components/tree/phyloTree/labels.js
+@@ -30,6 +30,7 @@ export const updateTipLabels = function updateTipLabels(dt) {
+     }
+ 
+     window.setTimeout(() => {
++      if (this.disposed) return;
+       this.groups.tipLabels
+         .selectAll(".tipLabel")
+         .data(inViewVisibleTips)
 diff --git a/src/components/tree/phyloTree/layouts.ts b/src/components/tree/phyloTree/layouts.ts
 index a1537c670dfd460d3399961a7945f44dad6de9a5..31747990c1a73011e72acfbaf544ac8e0f187613 100644
 --- a/src/components/tree/phyloTree/layouts.ts
@@ -525,8 +568,46 @@ index a1537c670dfd460d3399961a7945f44dad6de9a5..31747990c1a73011e72acfbaf544ac8e
    }
    return padBy;
  }
+diff --git a/src/components/tree/phyloTree/phyloTree.ts b/src/components/tree/phyloTree/phyloTree.ts
+index d4f928d487df9ad1b681caf4bedbd1c57e980c21..9ed15b2a8658d56cc31416094f60c4132f6d795f 100644
+--- a/src/components/tree/phyloTree/phyloTree.ts
++++ b/src/components/tree/phyloTree/phyloTree.ts
+@@ -19,6 +19,7 @@ const PhyloTree = function PhyloTree(
+   idxOfInViewRootNode: number,
+ ): void {
+   this.grid = false;
++  this.disposed = false;
+   this.attributes = ['r', 'cx', 'cy', 'id', 'class', 'd'];
+   this.params = createDefaultParams();
+   this.groups = {};
+@@ -57,6 +58,7 @@ PhyloTree.prototype.modifySVGInStages = modifySVGInStages;
+ /* I N I T I A L        R E N D E R       E T C */
+ PhyloTree.prototype.render = renderers.render;
+ PhyloTree.prototype.clearSVG = renderers.clearSVG;
++PhyloTree.prototype.dispose = renderers.dispose;
+ 
+ /* D R A W I N G    F U N C T I O N S */
+ PhyloTree.prototype.setClipMask = renderers.setClipMask;
+diff --git a/src/components/tree/phyloTree/renderers.ts b/src/components/tree/phyloTree/renderers.ts
+index 367f3ec3a5b42c2f9db045300e6e74432247e54d..97d29f9939c815cea51c7e47714aa65674cc5a45 100644
+--- a/src/components/tree/phyloTree/renderers.ts
++++ b/src/components/tree/phyloTree/renderers.ts
+@@ -421,6 +421,13 @@ export const clearSVG = function clearSVG(this: PhyloTreeType): void {
+   this.svg.selectAll("*").remove();
+ };
+ 
++/* Stop drawing and remove everything drawn. Pending deferred drawing steps (staged transitions, tip label timers) check
++ * `disposed` and do nothing, so a disposed tree cannot draw into an SVG that is reused by another tree. */
++export const dispose = function dispose(this: PhyloTreeType): void {
++  this.disposed = true;
++  if (this.svg) this.clearSVG();
++};
++
+ 
+ /* Due to errors rendering gradients on SVG branches on some browsers/OSs which would
+ cause the branches to not appear, we're falling back to the previous solution which
 diff --git a/src/components/tree/phyloTree/types.ts b/src/components/tree/phyloTree/types.ts
-index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..242c7d9625cd04f78781fa4f320ef3a65c3fb18e 100644
+index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..bd4ad82d8f7d4aeb6c952316ac187fe3b3e8fcd6 100644
 --- a/src/components/tree/phyloTree/types.ts
 +++ b/src/components/tree/phyloTree/types.ts
 @@ -38,6 +38,9 @@ export interface Regression {
@@ -551,8 +632,39 @@ index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..242c7d9625cd04f78781fa4f320ef3a6
  }
  
  // ---------- PhyloNode ---------- //
+@@ -257,6 +260,8 @@ export interface PhyloTreeType {
+   callbacks: Callbacks
+   change: typeof change
+   clearSVG: typeof renderers.clearSVG
++  dispose: typeof renderers.dispose
++  disposed: boolean
+   confidencesInSVG: boolean
+   dateRange: [number, number]
+   distance: Distance
+diff --git a/src/components/tree/tangle/index.js b/src/components/tree/tangle/index.js
+index 633c0d018c5947ddec85ca057a7e2df53d85cd1d..6b4c6cbdf71b396948dea2035dbbd2e0368e6049 100644
+--- a/src/components/tree/tangle/index.js
++++ b/src/components/tree/tangle/index.js
+@@ -76,9 +76,16 @@ class Tangle extends React.Component {
+       } else {
+         select(this.d3ref).selectAll(".tangleLine").remove();
+       }
+-      this.timeout = window.setTimeout(this.drawLines.bind(this), 1000);
++      this.timeout = window.setTimeout(() => {
++        this.timeout = false;
++        this.drawLines();
++      }, 1000);
+     }
+   }
++  componentWillUnmount() {
++    /* a pending redraw would draw into an SVG that is gone */
++    if (this.timeout) window.clearTimeout(this.timeout);
++  }
+   render() {
+     const textStyles = {position: "absolute", top: 25, zIndex: 100, fontSize: 16, color: "#000", fontWeight: 500};
+     const lefts = [this.props.width/2 - this.props.spaceBetweenTrees/2, this.props.width/2 + this.props.spaceBetweenTrees/2];
 diff --git a/src/components/tree/tree.tsx b/src/components/tree/tree.tsx
-index 5020928b7f4eb2edb11b6eadd3ba61ffda6ce9bb..3f0c6aab3971edfbb6c46dbf7cc6e66fe69ee838 100644
+index 5020928b7f4eb2edb11b6eadd3ba61ffda6ce9bb..e362e218e8ccc061e3cfc68cec37de60b74896a6 100644
 --- a/src/components/tree/tree.tsx
 +++ b/src/components/tree/tree.tsx
 @@ -1,4 +1,5 @@
@@ -561,12 +673,16 @@ index 5020928b7f4eb2edb11b6eadd3ba61ffda6ce9bb..3f0c6aab3971edfbb6c46dbf7cc6e66f
  import { withTranslation } from "react-i18next";
  import { updateVisibleTipsAndBranchThicknesses } from "../../actions/tree";
  import { SelectedNode } from "../../reducers/controls";
-@@ -77,6 +78,13 @@ export class TreeComponent extends React.Component<TreeComponentProps, TreeCompo
+@@ -77,6 +78,17 @@ export class TreeComponent extends React.Component<TreeComponentProps, TreeCompo
      }
    }
  
 +  override componentWillUnmount(): void {
-+    /* remove the drawing, so a later mount on the same DOM starts from an empty SVG */
++    /* stop the pending drawing steps of the trees (staged transitions, tip label timers) */
++    this.state.tree?.dispose();
++    this.state.treeToo?.dispose();
++    /* remove the drawing, so a later mount on the same DOM starts from an empty SVG. The state may not hold the trees
++     * yet, because the state update from componentDidMount can still be pending */
 +    for (const ref of [this.domRefs.mainTree, this.domRefs.secondTree]) {
 +      if (ref) select(ref).selectAll("*").remove();
 +    }

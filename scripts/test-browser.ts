@@ -175,6 +175,21 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  {
+    name: "redraws the tree at once when its panel changes size",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset)
+      await page.locator("#MainTree .tip").first().waitFor()
+      // Auspice skips the animation of updates requested within 1.4 s of the previous one
+      await page.waitForTimeout(1_500)
+      await page.setViewportSize({ width: 800, height: 900 })
+      // Auspice animates tree changes for 700 ms. Tips that move from positions computed for the
+      // wider panel would stay outside the narrower SVG for most of that time.
+      await page.waitForTimeout(150)
+      assert.deepEqual(await tipsOutsideTreeSvg(page), [])
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {
@@ -244,6 +259,20 @@ interface OpenViewer {
   readonly page: Page
   readonly pageErrors: string[]
   readonly consoleTimers: string[]
+}
+
+/** Return the names of the tips whose circles lie outside the main tree SVG */
+function tipsOutsideTreeSvg(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const svg = document.getElementById("MainTree")?.closest("svg")?.getBoundingClientRect()
+    if (svg === undefined) return ["(no tree)"]
+    return [...document.querySelectorAll("#MainTree .tip")]
+      .filter((tip) => {
+        const rect = tip.getBoundingClientRect()
+        return rect.left < svg.left || rect.right > svg.right
+      })
+      .map((tip) => tip.id)
+  })
 }
 
 /** Return the tip labels that extend past the right edge of the tree panel on screen */
