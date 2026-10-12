@@ -25,7 +25,6 @@ const registry: Record<string, unknown> = {
   treeButtonsComponent: TreeDownloadButtons,
   filePrefix: "view",
   entryPage: "splash",
-  browserTitle: "Auspice Tree Viewer",
   enableDatasetEditor: true,
   finePrint: "Auspice runs locally inside VS Code.",
 }
