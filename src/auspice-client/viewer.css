@@ -24,6 +24,16 @@
   position: relative;
 }
 
+/*
+ * The shell chrome (toolbar, error page) uses the VS Code font. Auspice's global stylesheet sets
+ * Lato on every `div` and `button`, so these rules name the font on the elements themselves.
+ */
+.auspice-vscode-toolbar,
+.auspice-vscode-button,
+.auspice-vscode-error {
+  font-family: var(--vscode-font-family);
+}
+
 .auspice-vscode-toolbar {
   align-items: center;
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));

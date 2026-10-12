@@ -138,11 +138,23 @@ async function inlineCssUrls(cssPath: string): Promise<string> {
   for (const match of references) {
     const reference = match.groups?.["ref"]
     if (reference === undefined || /^(?:data:|https?:|#)/u.test(reference)) continue
-    const assetPath = resolve(baseDir, reference.split(/[?#]/u)[0] ?? reference)
-    const dataUrl = await tryDataUrl(assetPath)
+    const dataUrl = await tryDataUrl(
+      resolveCssUrl(reference.split(/[?#]/u)[0] ?? reference, baseDir),
+    )
     if (dataUrl !== undefined) result = result.replace(match[0], `url(${dataUrl})`)
   }
   return result
+}
+
+// Resolve `url(...)` like CSS: relative to the stylesheet, or a package path (e.g. a font of
+// `typeface-lato`) through the module resolver
+function resolveCssUrl(reference: string, baseDir: string): string {
+  if (/^\.{0,2}\//u.test(reference)) return resolve(baseDir, reference)
+  try {
+    return Bun.resolveSync(reference, baseDir)
+  } catch {
+    return resolve(baseDir, reference)
+  }
 }
 
 async function tryDataUrl(assetPath: string): Promise<string | undefined> {

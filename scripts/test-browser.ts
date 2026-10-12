@@ -158,6 +158,18 @@ const scenarios: readonly Scenario[] = [
       await page.getByText("Color By", { exact: true }).waitFor()
       await page.locator('button[data-for="EditButton"]').waitFor()
       assert.equal(await page.locator(".leaflet-container").count(), 0)
+      // Auspice text is set in Lato, which the bundle carries along with Auspice's stylesheets
+      const loadedFaces = await page.evaluate(async () => {
+        await document.fonts.ready
+        return [...document.fonts]
+          .filter((face) => face.status === "loaded")
+          .map((face) => `${face.family.replaceAll('"', "")} ${face.weight}`)
+      })
+      assert.ok(loadedFaces.includes("Lato 400"), `loaded font faces: ${loadedFaces.join(", ")}`)
+      assert.equal(
+        await page.evaluate(() => getComputedStyle(document.documentElement).fontSize),
+        "10px",
+      )
       assert.deepEqual(pageErrors, [])
       assert.deepEqual(consoleTimers, [])
     },

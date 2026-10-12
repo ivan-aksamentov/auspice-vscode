@@ -46,6 +46,16 @@ import { App } from "./App"
 // Side-effect import: wires the host <-> webview message bridge and posts "ready".
 import "./bridge"
 
+// Auspice's global stylesheets, in the order of its own entry point. They set the Lato
+// typeface, the 10 px root font size that Auspice's `rem` sizes assume, and the styles of
+// notifications and react-select. The shell's stylesheet comes last to restyle its own chrome.
+import "@auspice/css/global.css"
+import "@auspice/css/browserCompatability.css"
+import "@auspice/css/bootstrapCustomized.css"
+import "@auspice/css/static.css"
+import "@auspice/css/notifications.css"
+import "@auspice/css/select.css"
+import "./fonts.css"
 import "./viewer.css"
 
 // Auspice keeps animation scratch state on this global (normally seeded by its

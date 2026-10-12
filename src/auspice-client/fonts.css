@@ -1,0 +1,45 @@
+/*
+ * Lato, the typeface of Auspice and nextstrain.org. Auspice's entry point loads every weight of
+ * `typeface-lato` in two formats; the shell inlines its fonts into the bundle, so it declares only
+ * the weights Auspice uses (lighter weights fall back to 300, medium to 400, heavier to 700), and
+ * only as WOFF2, which every VS Code webview supports.
+ */
+@font-face {
+  font-display: swap;
+  font-family: "Lato";
+  font-style: normal;
+  font-weight: 300;
+  src: url("typeface-lato/files/lato-latin-300.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Lato";
+  font-style: normal;
+  font-weight: 400;
+  src: url("typeface-lato/files/lato-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Lato";
+  font-style: italic;
+  font-weight: 400;
+  src: url("typeface-lato/files/lato-latin-400italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Lato";
+  font-style: normal;
+  font-weight: 700;
+  src: url("typeface-lato/files/lato-latin-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Lato";
+  font-style: italic;
+  font-weight: 700;
+  src: url("typeface-lato/files/lato-latin-700italic.woff2") format("woff2");
+}
