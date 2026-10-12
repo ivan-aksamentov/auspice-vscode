@@ -123,6 +123,28 @@ abstract: "The abstract."
 
 The first slide.
 `
+// The branch label dataset as a time tree with long tip names, which the clock and scatter layouts
+// plot against dates
+const datedBranchLabelDataset = {
+  ...branchLabelDataset,
+  meta: { ...branchLabelDataset.meta, title: "Dated branch label contract" },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0, num_date: { value: 2000 } },
+    children: [
+      {
+        name: "near_root",
+        node_attrs: { div: 0.002, num_date: { value: 2001 } },
+        branch_attrs: { labels: { clade: ROOT_BRANCH_LABEL } },
+        children: [
+          { name: `${LONG_TIP_NAME}_A`, node_attrs: { div: 0.14, num_date: { value: 2020 } } },
+          { name: `${LONG_TIP_NAME}_B`, node_attrs: { div: 0.12, num_date: { value: 2018 } } },
+        ],
+      },
+      { name: `${LONG_TIP_NAME}_C`, node_attrs: { div: 0.1, num_date: { value: 2015 } } },
+    ],
+  },
+}
 // A time tree whose tip names are long enough to leave little room for the time axis
 const timeTreeDataset = {
   version: "v2",
@@ -468,6 +490,37 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  ...["clock", "scatter", "radial", "unrooted"].map((layout) => ({
+    name: `keeps branch and axis labels inside the tree panel in the ${layout} layout`,
+    async run(): Promise<void> {
+      const { page, pageErrors } = await openViewer(datedBranchLabelDataset)
+      await page.locator("#MainTree .branchLabel").getByText(ROOT_BRANCH_LABEL).waitFor()
+      await page.getByRole("button", { name: layout, exact: true }).click()
+      // Auspice moves the tree to the new layout in stages, which take up to 2 s
+      await page.waitForFunction(
+        (expected) => new URLSearchParams(window.location.search).get("l") === expected,
+        layout,
+      )
+      await page.waitForTimeout(2_500)
+      assert.deepEqual(await treeLabelsOutsideTreeSvg(page), [])
+      assert.deepEqual(pageErrors, [])
+    },
+  })),
+  {
+    name: "hides the branch labels of a narrow tanglegram tree that do not fit beside the root",
+    async run() {
+      // Long tip names take most of each half of a 900 px viewer, so the margin on the root side
+      // reaches its limit of a quarter of the tree before the longest labels fit
+      const { page, pageErrors } = await openViewer(datedBranchLabelDataset, {
+        viewport: { width: 900, height: 700 },
+        secondDataset: datedBranchLabelDataset,
+      })
+      await page.locator("#SecondTree .tip").first().waitFor()
+      assert.deepEqual(await treeLabelsOutsideTreeSvg(page, "MainTree"), [])
+      assert.deepEqual(await treeLabelsOutsideTreeSvg(page, "SecondTree"), [])
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {
@@ -613,12 +666,12 @@ function branchesOutsideTheirClip(page: Page, treeId: string): Promise<string[]>
 }
 
 /**
- * Return the visible labels of the main tree that are not completely shown on screen: labels that
- * extend past the tree SVG, or past the clip path of their group
+ * Return the visible labels of a tree that are not completely shown on screen: labels that extend
+ * past the tree SVG, or past the clip path of their group
  */
-function treeLabelsOutsideTreeSvg(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const tree = document.getElementById("MainTree")
+function treeLabelsOutsideTreeSvg(page: Page, treeId = "MainTree"): Promise<string[]> {
+  return page.evaluate((id) => {
+    const tree = document.getElementById(id)
     const svg = tree?.closest("svg")?.getBoundingClientRect()
     if (tree === null || svg === undefined) return ["(no tree)"]
     const tolerancePx = 0.5
@@ -658,7 +711,7 @@ function treeLabelsOutsideTreeSvg(page: Page): Promise<string[]> {
       ).matrixTransform(matrix)
       return { left: topLeft.x, right: bottomRight.x, top: topLeft.y, bottom: bottomRight.y }
     }
-  })
+  }, treeId)
 }
 
 /**
