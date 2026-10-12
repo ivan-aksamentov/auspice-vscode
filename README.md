@@ -115,7 +115,7 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
 
 ## Requirements
 
-VS Code `1.67.0` or newer.
+VS Code `1.74.0` or newer.
 
 ## Maintenance
 
