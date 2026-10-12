@@ -123,6 +123,19 @@ abstract: "The abstract."
 
 The first slide.
 `
+// A slide without a panel query (`d=`) shows the panels that the dataset shows by default
+const PANEL_FREE_NARRATIVE = `---
+title: Narrative without panel queries
+authors: "Author"
+date: "October 2026"
+dataset: "https://nextstrain.org/entropy"
+abstract: "The abstract."
+---
+
+# [First slide](https://nextstrain.org/entropy)
+
+The first slide.
+`
 // The branch label dataset as a time tree with long tip names, which the clock and scatter layouts
 // plot against dates
 const datedBranchLabelDataset = {
@@ -189,7 +202,9 @@ const scenarios: readonly Scenario[] = [
   {
     name: "renders the controls and leaves out the map while maps are off",
     async run() {
-      const { page, pageErrors, consoleTimers } = await openViewer(contractDataset)
+      const { page, pageErrors, consoleTimers } = await openViewer(contractDataset, {
+        panels: "dataset",
+      })
       await page.getByText("Color By", { exact: true }).waitFor()
       await page.locator('button[data-for="EditButton"]').waitFor()
       assert.equal(await page.locator(".leaflet-container").count(), 0)
@@ -227,7 +242,7 @@ const scenarios: readonly Scenario[] = [
   {
     name: "exports the genetic diversity bars of a panel below the fold",
     async run() {
-      const { page, pageErrors } = await openViewer(entropyDataset)
+      const { page, pageErrors } = await openViewer(entropyDataset, { panels: "dataset" })
       await page.locator("#d3entropyParent").waitFor()
       await zoomIntoClade(page, "AB")
       await page.locator("#d3entropyParent").getByText("data loading").waitFor()
@@ -330,6 +345,36 @@ const scenarios: readonly Scenario[] = [
       await treePanel.focus()
       await page.keyboard.press("Space")
       await page.locator("#MainTree").waitFor({ state: "detached" })
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "starts with only the tree and turns on another panel from the sidebar",
+    async run() {
+      const { page, pageErrors } = await openViewer(entropyDataset)
+      await page.locator("#MainTree .tip").first().waitFor()
+      assert.equal(await page.locator("#d3entropyParent").count(), 0)
+      assert.equal(await page.getByRole("checkbox", { name: "Show Tree panel" }).isChecked(), true)
+      const entropyPanel = page.getByRole("checkbox", { name: "Show Entropy panel" })
+      assert.equal(await entropyPanel.isChecked(), false)
+
+      await entropyPanel.focus()
+      await page.keyboard.press("Space")
+      await page.locator("#d3entropyParent").waitFor()
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "shows the panels of a narrative slide without a panel query",
+    async run() {
+      const { page, pageErrors } = await openViewer(undefined, {
+        files: [
+          { name: "story.md", text: PANEL_FREE_NARRATIVE },
+          { name: "entropy.json", text: JSON.stringify(entropyDataset) },
+        ],
+      })
+      await page.locator("#NarrativeBlock_0 .explanation").waitFor()
+      await page.locator("#d3entropyParent").waitFor()
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -524,7 +569,10 @@ const scenarios: readonly Scenario[] = [
   {
     name: "draws the map when maps are on",
     async run() {
-      const { page, pageErrors } = await openViewer(contractDataset, { maps: true })
+      const { page, pageErrors } = await openViewer(contractDataset, {
+        maps: true,
+        panels: "dataset",
+      })
       // Tile requests leave the test page and are aborted; the map itself still renders
       await page.locator(".leaflet-container canvas").first().waitFor()
       assert.deepEqual(pageErrors, [])
@@ -533,7 +581,11 @@ const scenarios: readonly Scenario[] = [
   {
     name: "hides the map and reports why when the window has no WebGL",
     async run() {
-      const { page, pageErrors } = await openViewer(contractDataset, { maps: true, webgl: false })
+      const { page, pageErrors } = await openViewer(contractDataset, {
+        maps: true,
+        webgl: false,
+        panels: "dataset",
+      })
       await page.locator("#MainTree .tip").first().waitFor()
       assert.equal(await page.locator(".leaflet-container").count(), 0)
       assert.equal(await page.getByText("Something's gone wrong within the map panel").count(), 0)
@@ -596,6 +648,7 @@ async function openViewer(
     sidebar = "open",
     maps = false,
     webgl = true,
+    panels = "tree",
   }: ViewerOptions = {},
 ): Promise<OpenViewer> {
   const page = await browser.newPage({ viewport })
@@ -637,7 +690,7 @@ async function openViewer(
       : [{ name: "second.auspice.json", text: JSON.stringify(secondDataset) }]),
     ...files,
   ]
-  await loadFiles(page, resources, { sidebar, maps })
+  await loadFiles(page, resources, { sidebar, maps, panels })
   return { page, pageErrors, consoleTimers }
 }
 
@@ -657,6 +710,8 @@ interface ViewerOptions {
   readonly maps?: boolean
   /** Whether the browser provides WebGL */
   readonly webgl?: boolean
+  /** The `initialPanels` setting */
+  readonly panels?: "tree" | "dataset"
 }
 
 interface ViewerFile {
@@ -877,10 +932,18 @@ async function downloadsFromTreeButtons(
 async function loadFiles(
   page: Page,
   files: readonly ViewerFile[],
-  { sidebar, maps }: { readonly sidebar: "open" | "closed"; readonly maps: boolean },
+  {
+    sidebar,
+    maps,
+    panels,
+  }: {
+    readonly sidebar: "open" | "closed"
+    readonly maps: boolean
+    readonly panels: "tree" | "dataset"
+  },
 ): Promise<void> {
   await page.evaluate(
-    ({ inputFiles, sidebarInitialState, mapsEnabled }) => {
+    ({ inputFiles, sidebarInitialState, mapsEnabled, initialPanels }) => {
       const resources = inputFiles.map(({ name, text }) => ({
         uri: `file:///${name}`,
         name,
@@ -895,12 +958,13 @@ async function loadFiles(
           largeTreeTipAdvisory: 0,
           mapsEnabled,
           sidebarInitialState,
+          initialPanels,
           locale: "en",
         },
         "*",
       )
     },
-    { inputFiles: files, sidebarInitialState: sidebar, mapsEnabled: maps },
+    { inputFiles: files, sidebarInitialState: sidebar, mapsEnabled: maps, initialPanels: panels },
   )
   await page.waitForFunction(
     () =>

@@ -4,13 +4,15 @@ import { createStateFromQueryOrJSONs } from "@auspice/actions/recomputeReduxStat
 import store from "@auspice/store"
 
 import type { MainInput, ParsedInputs, ViewerDiagnostic } from "./input"
-import { applyMapSetting, canDrawMaps } from "./mapSetting"
+import { applyInitialPanels, applyMapSetting, canDrawMaps } from "./panelSettings"
+import type { InitialPanels } from "./panelSettings"
 
 export function loadIntoAuspice(
   inputs: ParsedInputs,
   largeTreeTipAdvisory: number,
   mapsEnabled: boolean,
   sidebarInitialState: "open" | "closed" | "dataset",
+  initialPanels: InitialPanels,
   locale: string,
   isCurrent: () => boolean,
 ): readonly ViewerDiagnostic[] {
@@ -37,9 +39,14 @@ export function loadIntoAuspice(
         "Maps are enabled, but this VS Code window cannot draw them: the map needs WebGL, which is unavailable, e.g. with hardware acceleration disabled. The map panel is hidden.",
     })
   }
-  const mainJson = applyMapSetting(main.json, showMaps)
+  // A narrative shows the panels its author chose for each slide
+  const settings: ViewSettings = {
+    showMaps,
+    initialPanels: inputs.narrative === undefined ? initialPanels : "dataset",
+  }
+  const mainJson = applySettings(main.json, settings)
   const second = selectMain(inputs, 1)
-  const secondJson = second === undefined ? false : applyMapSetting(second.json, showMaps)
+  const secondJson = second === undefined ? false : applySettings(second.json, settings)
   const measurementsData = findSidecar(inputs, main, "measurements")?.json
   dispatch({
     type: "CLEAN_START",
@@ -66,7 +73,7 @@ export function loadIntoAuspice(
   dispatch({ type: "CHANGE_LANGUAGE", data: locale })
   dispatch({ type: "PAGE_CHANGE", displayComponent: "main" })
   const datasets = Object.fromEntries(
-    inputs.mains.map((input) => [input.datasetName, createDataset(input, inputs, showMaps)]),
+    inputs.mains.map((input) => [input.datasetName, createDataset(input, inputs, settings)]),
   )
   datasets[main.datasetName]?.loadSidecars(store.dispatch)
   if (inputs.narrative !== undefined) dispatch({ type: "CACHE_JSONS", jsons: datasets })
@@ -81,9 +88,25 @@ export function loadIntoAuspice(
   return diagnostics
 }
 
-function createDataset(main: MainInput, inputs: ParsedInputs, showMaps: boolean): DatasetInstance {
+function applySettings(
+  json: Record<string, unknown>,
+  settings: ViewSettings,
+): Record<string, unknown> {
+  return applyInitialPanels(applyMapSetting(json, settings.showMaps), settings.initialPanels)
+}
+
+interface ViewSettings {
+  readonly showMaps: boolean
+  readonly initialPanels: InitialPanels
+}
+
+function createDataset(
+  main: MainInput,
+  inputs: ParsedInputs,
+  settings: ViewSettings,
+): DatasetInstance {
   const dataset = new Dataset(main.datasetName)
-  dataset.main = Promise.resolve(applyMapSetting(main.json, showMaps))
+  dataset.main = Promise.resolve(applySettings(main.json, settings))
   const tipFrequencies = inputs.sidecars.find(
     (sidecar) =>
       sidecar.datasetName === datasetName(main.datasetName) && sidecar.kind === "tipFrequencies",

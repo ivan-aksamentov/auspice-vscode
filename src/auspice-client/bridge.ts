@@ -22,6 +22,7 @@ const hostMessageSchema = z.discriminatedUnion("type", [
     largeTreeTipAdvisory: z.number().int().nonnegative(),
     mapsEnabled: z.boolean(),
     sidebarInitialState: z.enum(["open", "closed", "dataset"]),
+    initialPanels: z.enum(["tree", "dataset"]),
     locale: z.string().min(2),
   }),
   z.object({ type: z.literal("stale"), stale: z.boolean() }),
@@ -125,6 +126,7 @@ async function load(message: LoadMessage): Promise<void> {
       message.largeTreeTipAdvisory,
       message.mapsEnabled,
       message.sidebarInitialState,
+      message.initialPanels,
       message.locale,
       () => message.generation === latestGeneration,
     )
@@ -187,6 +189,7 @@ interface LoadMessage {
   readonly largeTreeTipAdvisory: number
   readonly mapsEnabled: boolean
   readonly sidebarInitialState: "open" | "closed" | "dataset"
+  readonly initialPanels: "tree" | "dataset"
   readonly locale: string
 }
 

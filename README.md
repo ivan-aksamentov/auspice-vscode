@@ -41,6 +41,7 @@ Alternatively, open the Extensions view, select **Views and More Actions...**, c
 - **Metadata**: apply CSV, TSV, XLSX, or node-data JSON to the active view.
 - **Comparison and narratives**: open a second tree in a tangle view, or render a local Markdown narrative with its referenced datasets.
 - **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels. The tab on its edge folds it away and back; the tree always fills the space beside it.
+- **Tree first**: a viewer starts with only the tree. The sidebar has a toggle for each other panel of the dataset: Map, Entropy, Frequency, and Measurements.
 - **Downloads**: the SVG, JSON, and NWK buttons above the tree save the current view as a figure, an Auspice dataset, or a Newick tree. The save dialog proposes a file next to the dataset, named after it.
 
 Each primary dataset opens in its own tab with an independent store and file lifecycle.
@@ -74,6 +75,11 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
   //   true [default]: discover and attach companions automatically
   //   false: open only the file you selected
   "auspiceVscode.companionDiscovery": true,
+
+  // Panels shown when a tab is opened or reloaded. Narratives always show the panels of each slide.
+  //   "tree" [default]: show only the tree; the sidebar keeps a toggle for each other panel of the dataset
+  //   "dataset": show the panels that the dataset shows by default
+  "auspiceVscode.initialPanels": "tree",
 
   // Show a performance advisory when a tree exceeds this many tips.
   //   integer >= 0 [default 5000]: tip-count threshold; 0 disables the advisory

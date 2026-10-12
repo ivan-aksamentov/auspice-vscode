@@ -279,6 +279,20 @@
           ],
           "description": "Initial sidebar state for newly opened or reloaded Auspice tabs."
         },
+        "auspiceVscode.initialPanels": {
+          "type": "string",
+          "enum": [
+            "tree",
+            "dataset"
+          ],
+          "default": "tree",
+          "scope": "resource",
+          "enumDescriptions": [
+            "Show only the tree. The sidebar keeps a toggle for each other panel of the dataset.",
+            "Show the panels that the dataset shows by default."
+          ],
+          "description": "Panels shown when an Auspice tab is opened or reloaded. Narratives always show the panels of each slide."
+        },
         "auspiceVscode.preserveBackgroundViews": {
           "type": "boolean",
           "default": true,

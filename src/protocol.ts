@@ -43,6 +43,7 @@ export interface LoadMessage {
   readonly largeTreeTipAdvisory: number
   readonly mapsEnabled: boolean
   readonly sidebarInitialState: "open" | "closed" | "dataset"
+  readonly initialPanels: "tree" | "dataset"
   readonly locale: string
 }
 

@@ -346,6 +346,7 @@ function createViewerSession(
         largeTreeTipAdvisory: largeTreeTipAdvisory(uri),
         mapsEnabled: mapsEnabled(uri),
         sidebarInitialState: sidebarInitialState(uri),
+        initialPanels: initialPanels(uri),
         locale: auspiceLocale(),
       }
       committedGeneration = generation
@@ -613,6 +614,11 @@ function sidebarInitialState(uri: Uri): "open" | "closed" | "dataset" {
     .getConfiguration("auspiceVscode", uri)
     .get<unknown>("sidebarInitialState")
   return configured === "closed" || configured === "dataset" ? configured : "open"
+}
+
+function initialPanels(uri: Uri): "tree" | "dataset" {
+  const configured = workspace.getConfiguration("auspiceVscode", uri).get<unknown>("initialPanels")
+  return configured === "dataset" ? configured : "tree"
 }
 
 function auspiceLocale(): string {
