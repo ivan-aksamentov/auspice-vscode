@@ -10,6 +10,9 @@ index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2
 diff --git a/node_modules/auspice/.bun-tag-33dd6a5242cfeb13 b/.bun-tag-33dd6a5242cfeb13
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/auspice/.bun-tag-ca314a6f50fee5ef b/.bun-tag-ca314a6f50fee5ef
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/auspice/.bun-tag-cb89d3964373411e b/.bun-tag-cb89d3964373411e
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -575,19 +578,6 @@ index 327c77eacf41a8b6e256b49207afd906f7f91515..4067926c1006ba9893202621939e96d4
    }
  }
  
-diff --git a/src/components/framework/spinner.js b/src/components/framework/spinner.js
-index f48aaf6fc37c5d9e22ddda42eabe8c488a5a6e33..54f7b6c83641c179570b544a9b7fb58ba93ceba7 100644
---- a/src/components/framework/spinner.js
-+++ b/src/components/framework/spinner.js
-@@ -15,7 +15,7 @@ export const PanelSpinner = ({height, width}) => {
- 
- export function FullPageSpinner() {
-   return (
--    <div style={{display: "flex", flexDirection: "column", justifyContent: "center", height: "50vh"}}>
-+    <div style={{display: "flex", alignItems: "center", justifyContent: "center", height: "100%"}}>
-       <div className="rootSpinner"> {/* CSS definition in entry index.html */}
-         <SvgLogo/>
-       </div>
 diff --git a/src/components/info/byline.js b/src/components/info/byline.js
 index 33da38f8012b102c00030b75d244f3ba424728cb..ebc5c5235596bc80c4a9767fefe061db65a1518e 100644
 --- a/src/components/info/byline.js
@@ -660,51 +650,6 @@ index 5c1e69c62ab2328fd2c5ca71e17bc951bd724101..7a76b88e3a29fce33b8074dd27d35817
          <FaTrash data-tip data-for={id+'remove'}/>
          <Tooltip id={id+'remove'}>{'Remove this filter'}</Tooltip>
        </IconContainer>
-diff --git a/src/components/main/sidebar.tsx b/src/components/main/sidebar.tsx
-index 551be751d37c879f4f849d3392efb8cb655ad309..32766644a25c314c9201bd9b95199377073fe242 100644
---- a/src/components/main/sidebar.tsx
-+++ b/src/components/main/sidebar.tsx
-@@ -2,10 +2,9 @@ import React from "react";
- import { useSelector } from "react-redux";
- import {ThemeProvider} from 'styled-components';
- import Narrative from "../narrative";
--import NavBar from "../navBar";
-+import NavBar, { getNavBarHeight } from "../navBar";
- import Controls from "../controls/controls";
- import { SidebarContainer, sidebarTheme } from "./styles";
--import { narrativeNavBarHeight } from "../../util/globals";
- import { RootState } from "../../store";
- 
- 
-@@ -24,7 +23,7 @@ export const Sidebar = (
-           width={width}
-         />
-         {displayNarrative ? (
--          <Narrative height={height - narrativeNavBarHeight} width={width} />
-+          <Narrative height={height - getNavBarHeight(true)} width={width} />
-         ) : (
-           <Controls />
-         )}
-diff --git a/src/components/navBar/index.js b/src/components/navBar/index.js
-index 02d4e40962570749f03200e9c2a3a474414bbd23..36ed0afa5716f69495b7a79402f8bf8ec79c1c97 100644
---- a/src/components/navBar/index.js
-+++ b/src/components/navBar/index.js
-@@ -24,10 +24,15 @@ const NavBarContainer = styled.div`
- const Content = hasExtension("navbarComponent") ?
-   getExtension("navbarComponent") : AuspiceNavBar;
- 
-+export const getNavBarHeight = (narrative) => Content ?
-+  (narrative ? narrativeNavBarHeight : normalNavBarHeight) : 0;
- 
- const NavBar = ({sidebar, toggleHandler, narrativeTitle, width}) => {
-   // const styles = getStyles({minified, narrative: !!narrativeTitle, width});
-   const showSidebarToggle = sidebar && !narrativeTitle;
-+  if (!Content) {
-+    return <SidebarChevron navHeight={normalNavBarHeight} navWidth={width} display={showSidebarToggle} onClick={toggleHandler}/>;
-+  }
-   return (
-     <NavBarContainer>
-       <Content
 diff --git a/src/components/tree/phyloTree/change.ts b/src/components/tree/phyloTree/change.ts
 index 3a876916302dbb571155123e5de75246d317bde3..8ff35fbe14412ee1156e3c4bcd4de851cc473870 100644
 --- a/src/components/tree/phyloTree/change.ts

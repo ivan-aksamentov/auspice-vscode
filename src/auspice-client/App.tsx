@@ -1,5 +1,4 @@
 import { BROWSER_DIMENSIONS, TOGGLE_MOBILE_DISPLAY } from "@auspice/actions/types"
-import Main from "@auspice/components/main"
 import store from "@auspice/store"
 import React, { Suspense, useEffect, useRef } from "react"
 import { Provider, useSelector } from "react-redux"
@@ -8,13 +7,15 @@ import { ViewerSplash } from "./components"
 import { createPanelDimensionDispatcher } from "./dimensions"
 import { ErrorBoundary } from "./ErrorBoundary"
 import { Toolbar } from "./Toolbar"
+import { ViewerMain } from "./ViewerMain"
 
-// The shell owns the chrome and the sizing. Auspice's own layout (`<Main>`)
-// derives every panel dimension from `state.browserDimensions`, which its
-// `<Monitor>` fills from `window`. Coupling to the window makes the view look
-// zoomed and animate in from a tiny size when the webview tab is shown again.
-// Instead, a ResizeObserver on the panel container feeds the real available
-// size (below the toolbar) into the store, so panels are correct on first paint.
+// The shell owns the chrome and the layout (`ViewerMain`). Auspice components
+// such as the info header and the modal size themselves from
+// `state.browserDimensions`, which Auspice's `<Monitor>` fills from `window`.
+// Coupling to the window makes the view look zoomed and animate in from a tiny
+// size when the webview tab is shown again. Instead, a ResizeObserver on the
+// viewer container feeds the real available size (below the toolbar) into the
+// store, so the components are correct on first paint.
 export function App(): React.ReactElement {
   const panelsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -34,13 +35,12 @@ export function App(): React.ReactElement {
       dimensions.dispose()
     }
   }, [])
-  // Auspice picks "mobile" chrome (a floating toggle button and a dimming
-  // overlay instead of an inline sidebar) whenever `window.innerWidth` is below
-  // its breakpoint. A webview pane is routinely narrower than that, so the
-  // viewer would open in mobile mode on a full-size desktop. The shell owns its
-  // own chrome and always docks the sidebar, so pin the store to desktop mode.
-  // Auspice's `<Monitor>` (which would flip this back on window resize) is not
-  // mounted here, so a single dispatch holds.
+  // Auspice components switch to a "mobile" variant whenever `window.innerWidth`
+  // is below its breakpoint. A webview pane is routinely narrower than that, so
+  // the viewer would render mobile controls on a full-size desktop. The shell
+  // always docks the sidebar, so pin the store to desktop mode. Auspice's
+  // `<Monitor>` (which would flip this back on window resize) is not mounted
+  // here, so a single dispatch holds.
   useEffect(() => {
     store.dispatch({ type: TOGGLE_MOBILE_DISPLAY, value: false })
   }, [])
@@ -62,7 +62,7 @@ function DisplaySwitch(): React.ReactElement {
   return (
     <ErrorBoundary>
       <Suspense fallback={null}>
-        <Main />
+        <ViewerMain />
       </Suspense>
     </ErrorBoundary>
   )

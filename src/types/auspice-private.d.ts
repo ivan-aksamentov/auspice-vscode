@@ -10,11 +10,191 @@ declare module "@auspice/store" {
   export default store
 }
 
-declare module "@auspice/components/main" {
+declare module "@auspice/components/controls/controls" {
   import type { ComponentType } from "react"
 
-  const Main: ComponentType
-  export default Main
+  const Controls: ComponentType
+  export default Controls
+}
+
+declare module "@auspice/components/narrative" {
+  import type { ComponentType } from "react"
+
+  const Narrative: ComponentType<{ readonly height: number; readonly width: number }>
+  export default Narrative
+}
+
+declare module "@auspice/components/narrative/MainDisplayMarkdown" {
+  import type { ComponentType } from "react"
+
+  const MainDisplayMarkdown: ComponentType<{ readonly width: number }>
+  export default MainDisplayMarkdown
+}
+
+declare module "@auspice/components/narrative/renderNarrativeToggle" {
+  import type { ReactElement } from "react"
+  import type { Dispatch } from "redux"
+
+  export function renderNarrativeToggle(
+    dispatch: Dispatch,
+    narrativeIsDisplayed: boolean,
+  ): ReactElement
+}
+
+declare module "@auspice/components/info/info" {
+  import type { ComponentType } from "react"
+
+  const Info: ComponentType<{ readonly width: number }>
+  export default Info
+}
+
+declare module "@auspice/components/framework/footer" {
+  import type { ComponentType } from "react"
+
+  const Footer: ComponentType<{ readonly width: number }>
+  export default Footer
+}
+
+declare module "@auspice/components/framework/fine-print" {
+  import type { ComponentType } from "react"
+
+  const FinePrint: ComponentType<{ readonly width: number }>
+  export default FinePrint
+}
+
+declare module "@auspice/components/framework/animationController" {
+  import type { ComponentType } from "react"
+
+  const AnimationController: ComponentType
+  export default AnimationController
+}
+
+declare module "@auspice/components/framework/spinner" {
+  import type { ComponentType } from "react"
+
+  export const PanelSpinner: ComponentType<{ readonly width: number; readonly height: number }>
+}
+
+declare module "@auspice/components/modal/Modal.jsx" {
+  import type { ComponentType } from "react"
+
+  const Modal: ComponentType
+  export default Modal
+}
+
+declare module "@auspice/components/errorBoundaries/panelErrorBoundary" {
+  import type { ComponentType, ReactNode } from "react"
+
+  const PanelErrorBoundary: ComponentType<{
+    readonly width: number
+    readonly height: number
+    readonly name: string
+    readonly children: ReactNode
+  }>
+  export default PanelErrorBoundary
+}
+
+declare module "@auspice/util/errorBoundary" {
+  import type { ComponentType, ReactNode } from "react"
+
+  const ErrorBoundary: ComponentType<{
+    readonly showNothing?: boolean
+    readonly children: ReactNode
+  }>
+  export default ErrorBoundary
+}
+
+declare module "@auspice/components/tree" {
+  import type { ComponentType } from "react"
+
+  const Tree: ComponentType<{ readonly width: number; readonly height: number }>
+  export default Tree
+}
+
+declare module "@auspice/components/entropy" {
+  import type { ComponentType } from "react"
+
+  const Entropy: ComponentType<{ readonly width: number; readonly height: number }>
+  export default Entropy
+}
+
+declare module "@auspice/components/frequencies" {
+  import type { ComponentType } from "react"
+
+  const Frequencies: ComponentType<{ readonly width: number; readonly height: number }>
+  export default Frequencies
+}
+
+declare module "@auspice/components/measurements" {
+  import type { ComponentType } from "react"
+
+  const Measurements: ComponentType<{
+    readonly width: number
+    readonly height: number
+    readonly showLegend: boolean
+  }>
+  export default Measurements
+}
+
+declare module "@auspice/components/map/map" {
+  import type { ComponentType } from "react"
+
+  const AuspiceMap: ComponentType<{
+    readonly width: number
+    readonly height: number
+    readonly justGotNewDatasetRenderNewMap: boolean
+    readonly legend: boolean
+  }>
+  export default AuspiceMap
+}
+
+declare module "@auspice/components/main/styles" {
+  // Auspice's sidebar theme: its defaults merged with the `sidebarTheme` extension
+  export const sidebarTheme: {
+    readonly background: string
+    readonly color: string
+    readonly "font-family": string
+    readonly sidebarBoxShadow: string
+    readonly selectedColor: string
+    readonly unselectedColor: string
+    readonly alternateBackground: string
+  }
+}
+
+declare module "@auspice/components/main/utils" {
+  interface PanelSize {
+    readonly width: number
+    readonly height: number
+  }
+  export function calcPanelDims(
+    panels: readonly string[],
+    narrativeIsDisplayed: boolean,
+    availableWidth: number,
+    availableHeight: number,
+  ): {
+    readonly full: PanelSize
+    readonly grid: PanelSize
+    readonly chartEntropy: PanelSize
+    readonly chartFrequencies: PanelSize
+  }
+  export function calcStyles(
+    browserDimensions: { readonly width: number; readonly height: number },
+    displayNarrative: boolean,
+    sidebarOpen: boolean,
+    mobileDisplay: boolean,
+  ): { readonly sidebarWidth: number }
+}
+
+declare module "@auspice/util/computeResponsive" {
+  export function calcUsableWidth(availableWidth: number, fraction: number): number
+}
+
+declare module "@auspice/util/globals" {
+  export const narrativeNavBarHeight: number
+}
+
+declare module "@auspice/actions/panelDisplay" {
+  export function numberOfGridPanels(panels: readonly string[]): number
 }
 
 declare module "@auspice/components/download/helperFunctions" {
@@ -53,6 +233,7 @@ declare module "@auspice/components/download/downloadModal" {
 declare module "@auspice/actions/types" {
   export const BROWSER_DIMENSIONS: string
   export const TOGGLE_MOBILE_DISPLAY: string
+  export const TOGGLE_SIDEBAR: string
 }
 
 declare module "@auspice/locales/en/language.json" {

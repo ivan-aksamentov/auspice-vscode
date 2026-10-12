@@ -25,6 +25,155 @@
 }
 
 /*
+ * The sidebar layout (`SidebarLayout`). The rail holds the sidebar and its pull tab and slides by
+ * `transform` only. The panel area beside it changes width once, after the slide, through
+ * `data-sidebar-space`. The sidebar never covers more than all but 40 px of the panel area.
+ */
+/*
+ * Auspice has no dark theme, so the layout keeps light form controls and scrollbars in dark editor
+ * themes, with thin scrollbars in the grey of Auspice's controls
+ */
+.auspice-vscode-layout {
+  color-scheme: light;
+  display: flex;
+  height: 100%;
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+}
+
+.auspice-vscode-rail {
+  bottom: 0;
+  left: 0;
+  max-width: calc(100% - 40px);
+  position: absolute;
+  top: 0;
+  transform: translateX(0);
+  transition: transform 0.15s ease-out;
+  width: var(--auspice-vscode-sidebar-width);
+  will-change: transform;
+  z-index: 3;
+}
+
+.auspice-vscode-rail[data-state="closed"] {
+  transform: translateX(-100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auspice-vscode-rail {
+    transition: none;
+  }
+}
+
+/* The inset shadow on the right edge makes the sidebar look recessed below the panels */
+.auspice-vscode-sidebar {
+  background: var(--auspice-vscode-sidebar-background);
+  box-shadow: -3px 0 3px -3px var(--auspice-vscode-sidebar-shadow) inset;
+  box-sizing: border-box;
+  color: var(--auspice-vscode-sidebar-color);
+  font-family: var(--auspice-vscode-sidebar-font);
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  scrollbar-width: thin;
+}
+
+/*
+ * Auspice's controls fill the sidebar height and add a bottom padding to it, which made the
+ * sidebar scroll even when the controls fit
+ */
+.auspice-vscode-sidebar > div {
+  box-sizing: border-box;
+}
+
+/*
+ * The pull tab on the right edge of the sidebar, in the sidebar's colors. It starts 3 px inside the
+ * sidebar, over its edge shadow, and continues that shadow around its outline; the clip path cuts
+ * the shadow on its left side, so the tab and the sidebar join without a seam.
+ */
+.auspice-vscode-pull-tab {
+  align-items: center;
+  background: var(--auspice-vscode-sidebar-background);
+  border: 0;
+  border-radius: 0 6px 6px 0;
+  box-shadow:
+    -3px 0 3px -3px var(--auspice-vscode-sidebar-shadow) inset,
+    0 3px 3px -3px var(--auspice-vscode-sidebar-shadow) inset,
+    0 -3px 3px -3px var(--auspice-vscode-sidebar-shadow) inset;
+  clip-path: inset(-12px -12px -12px 0);
+  color: var(--auspice-vscode-sidebar-unselected);
+  cursor: pointer;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  left: calc(100% - 3px);
+  padding: 0 0 0 3px;
+  position: absolute;
+  top: 0;
+  width: 15px;
+}
+
+.auspice-vscode-pull-tab:hover {
+  color: var(--auspice-vscode-sidebar-selected);
+}
+
+.auspice-vscode-pull-tab:focus-visible {
+  outline: 2px solid var(--auspice-vscode-sidebar-selected);
+  outline-offset: 2px;
+}
+
+/*
+ * The panel area. Layout containment makes it the containing block of fixed-position Auspice
+ * elements (the narrative toggle), which would otherwise anchor to the whole viewer and cover the
+ * toolbar.
+ */
+.auspice-vscode-panel-area {
+  background: #fff;
+  color: #000;
+  contain: layout;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  z-index: 0;
+}
+
+.auspice-vscode-panel-area[data-sidebar-space="reserved"] {
+  margin-left: min(var(--auspice-vscode-sidebar-width), calc(100% - 40px));
+}
+
+/* A stable scrollbar gutter keeps the measured width the same whether or not the panels scroll */
+.auspice-vscode-panels-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+/*
+ * The narrative title, in the row that Auspice's narrative reserves above its progress dots
+ * (`narrativeNavBarHeight`), where Auspice's navigation bar shows it
+ */
+.auspice-vscode-narrative-title {
+  box-sizing: border-box;
+  font-size: 17px;
+  font-weight: 400;
+  height: 55px;
+  line-height: 55px;
+  margin: 0;
+  overflow: hidden;
+  padding: 0 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
  * The shell chrome (toolbar, error page) uses the VS Code font. Auspice's global stylesheet sets
  * Lato on every `div` and `button`, so these rules name the font on the elements themselves.
  */
@@ -143,15 +292,12 @@
 
 /*
  * Auspice's spinner markup (`.rootSpinner`) is styled only in its `index.html`,
- * which the shell replaces. Provide the sizing/animation here so the panel and
- * full-page spinners render correctly.
+ * which the shell replaces. Provide the sizing/animation here so the spinner of
+ * a panel that is still loading renders in the panel's place.
  *
- * Centre on the wrapper rather than offsetting the spinner itself. Auspice's
- * original `left/top: 50%` + negative-margin trick assumes the spinner sits at
- * its container's top-left corner. `FullPageSpinner` instead centres it with
- * flexbox, so that offset stacked on top and pushed the spinner off-screen to
- * the bottom-right. Flex-centring every `.rootSpinner` wrapper handles the
- * full-page and fixed-size panel spinners alike.
+ * Centre on the wrapper rather than offsetting the spinner itself, as Auspice's
+ * `left/top: 50%` + negative-margin rule does: flex-centring every
+ * `.rootSpinner` wrapper centres the spinner in the panel's fixed-size box.
  */
 :has(> .rootSpinner) {
   align-items: center;

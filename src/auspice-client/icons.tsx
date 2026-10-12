@@ -46,7 +46,30 @@ export function IconDownload({ size = 16 }: IconProps): React.ReactElement {
   )
 }
 
-function Svg({ size, children }: IconProps & { children: React.ReactNode }): React.ReactElement {
+export function IconChevronLeft({ size = 16 }: IconProps): React.ReactElement {
+  return (
+    <Svg size={size} strokeWidth={2}>
+      <path d="M10.5 2.5 5 8 10.5 13.5" />
+    </Svg>
+  )
+}
+
+export function IconChevronRight({ size = 16 }: IconProps): React.ReactElement {
+  return (
+    <Svg size={size} strokeWidth={2}>
+      <path d="M5.5 2.5 11 8 5.5 13.5" />
+    </Svg>
+  )
+}
+
+function Svg({
+  size,
+  strokeWidth = 1.3,
+  children,
+}: IconProps & {
+  readonly strokeWidth?: number
+  readonly children: React.ReactNode
+}): React.ReactElement {
   return (
     <svg
       aria-hidden="true"
@@ -55,7 +78,7 @@ function Svg({ size, children }: IconProps & { children: React.ReactNode }): Rea
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.3}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
     >

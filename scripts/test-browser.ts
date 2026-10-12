@@ -110,6 +110,19 @@ const shortNameDataset = {
     children: ["A", "B", "C"].map((name) => ({ name, node_attrs: { div: 1 } })),
   },
 }
+// A narrative of the tip label dataset, which the viewer names "flu" after its file
+const NARRATIVE = `---
+title: Local narrative
+authors: "Author"
+date: "October 2026"
+dataset: "https://nextstrain.org/flu?d=tree"
+abstract: "The abstract."
+---
+
+# [First slide](https://nextstrain.org/flu?d=tree)
+
+The first slide.
+`
 // A time tree whose tip names are long enough to leave little room for the time axis
 const timeTreeDataset = {
   version: "v2",
@@ -298,6 +311,130 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  {
+    name: "folds the sidebar with its pull tab and gives its space to the panels",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset)
+      const tab = page.getByRole("button", { name: "Hide sidebar" })
+      const sidebar = page.getByRole("complementary", { name: "Controls" })
+      const panelArea = page.locator(".auspice-vscode-panel-area")
+      await page.locator("#MainTree .tip").first().waitFor()
+      assert.equal(await tab.getAttribute("aria-expanded"), "true")
+      const openWidth = await treeSvgWidth(page)
+
+      await tab.click()
+      // The panels widen once the sidebar has slid away
+      await page.locator('.auspice-vscode-panel-area[data-sidebar-space="free"]').waitFor()
+      const showTab = page.getByRole("button", { name: "Show sidebar" })
+      assert.equal(await showTab.getAttribute("aria-expanded"), "false")
+      assert.equal(
+        await sidebar.evaluate((element) => element instanceof HTMLElement && element.inert),
+        true,
+      )
+      // The tab stays on the left edge of the panels, clear of the panel content
+      const tabBox = await showTab.boundingBox()
+      assert.ok(tabBox !== null && tabBox.x + tabBox.width > 10 && tabBox.x < 1)
+      await page.waitForFunction((width) => {
+        const svg = document.getElementById("MainTree")?.closest("svg")
+        return Number(svg?.getAttribute("width")) > width + 200
+      }, openWidth)
+      assert.deepEqual(await tipsOutsideTreeSvg(page), [])
+
+      await showTab.focus()
+      await page.keyboard.press("Enter")
+      await page.locator('.auspice-vscode-panel-area[data-sidebar-space="reserved"]').waitFor()
+      assert.equal(
+        await sidebar.evaluate((element) => element instanceof HTMLElement && element.inert),
+        false,
+      )
+      assert.equal(await page.getByRole("button", { name: "Hide sidebar" }).isVisible(), true)
+      await page.waitForFunction(
+        (width) =>
+          Number(document.getElementById("MainTree")?.closest("svg")?.getAttribute("width")) ===
+          width,
+        openWidth,
+      )
+      const panelAreaBox = await panelArea.boundingBox()
+      // Auspice's sidebar is 266 px wide: 220 px controls and 46 px padding
+      assert.equal(panelAreaBox?.x, 266)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "starts with the sidebar folded when the setting asks for it",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset, { sidebar: "closed" })
+      await page.locator("#MainTree .tip").first().waitFor()
+      const tab = page.getByRole("button", { name: "Show sidebar" })
+      assert.equal(await tab.getAttribute("aria-expanded"), "false")
+      assert.equal(
+        await page.locator(".auspice-vscode-panel-area").getAttribute("data-sidebar-space"),
+        "free",
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  ...[
+    { viewport: { width: 1_400, height: 900 }, secondDataset: undefined },
+    { viewport: { width: 1_400, height: 900 }, secondDataset: shortNameDataset },
+    { viewport: { width: 900, height: 520 }, secondDataset: undefined },
+    { viewport: { width: 900, height: 520 }, secondDataset: shortNameDataset },
+  ].map(({ viewport, secondDataset }) => ({
+    name: `fits ${secondDataset === undefined ? "one tree" : "two trees"} into a ${viewport.width}x${viewport.height} panel area below the dataset header`,
+    async run(): Promise<void> {
+      const { page, pageErrors } = await openViewer(branchLabelDataset, { viewport, secondDataset })
+      await page.locator("#MainTree .tip").first().waitFor()
+      const gap = await page.evaluate(() => {
+        const area = document.querySelector(".auspice-vscode-panels-scroll")
+        const card = document.getElementById("MainTree")?.closest("[id$=Card]")
+        if (area === null || card === null || card === undefined) return Number.NaN
+        const marginBottom = parseFloat(getComputedStyle(card).marginBottom)
+        return (
+          area.getBoundingClientRect().bottom - card.getBoundingClientRect().bottom - marginBottom
+        )
+      })
+      // Oracle: the tree card ends at the bottom of the panel area, above the 2 px line gap below
+      // the inline-block card
+      assert.ok(gap >= 0 && gap <= 3, `gap below the tree card is ${gap} px`)
+      assert.deepEqual(pageErrors, [])
+    },
+  })),
+  {
+    name: "shows the narrative title above the slides and keeps the narrative toggle in the panel area",
+    async run() {
+      const { page, pageErrors } = await openViewer(undefined, {
+        files: [
+          { name: "story.md", text: NARRATIVE },
+          { name: "flu.json", text: JSON.stringify(tipLabelDataset) },
+        ],
+      })
+      // The title row above the progress dots, ahead of the title slide
+      await page.getByRole("heading", { level: 2, name: "Local narrative" }).first().waitFor()
+      await page.locator("#NarrativeBlock_0 .explanation").waitFor()
+      // Auspice fades the slides out below its progress dots, at a fixed offset that assumes a
+      // title row above the dots. Without the row, the fade covered the first lines of the slide.
+      const { progressBottom, fadeTop } = await page.evaluate(() => {
+        const progress = document.querySelector('#NarrativeContainer > [role="navigation"]')
+        const fade = progress?.nextElementSibling
+        return {
+          progressBottom: progress?.getBoundingClientRect().bottom ?? Number.NaN,
+          fadeTop: fade?.getBoundingClientRect().top ?? Number.NaN,
+        }
+      })
+      assert.ok(
+        Math.abs(fadeTop - progressBottom) < 1,
+        `the fade starts at ${fadeTop}, the progress dots end at ${progressBottom}`,
+      )
+      const toggle = page.getByRole("button", { name: "explore the data yourself" })
+      const toggleBox = await toggle.boundingBox()
+      const areaBox = await page.locator(".auspice-vscode-panel-area").boundingBox()
+      assert.ok(
+        toggleBox !== null && areaBox !== null && toggleBox.y >= areaBox.y - 1,
+        "the narrative toggle covers the toolbar",
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {
@@ -329,7 +466,12 @@ function browserHtml(): string {
 
 async function openViewer(
   dataset: unknown,
-  { viewport = { width: 1_400, height: 900 }, secondDataset }: ViewerOptions = {},
+  {
+    viewport = { width: 1_400, height: 900 },
+    secondDataset,
+    files = [],
+    sidebar = "open",
+  }: ViewerOptions = {},
 ): Promise<OpenViewer> {
   const page = await browser.newPage({ viewport })
   const pageErrors: string[] = []
@@ -351,12 +493,15 @@ async function openViewer(
       ) === true,
   )
   const resources = [
-    { name: "browser.auspice.json", content: dataset },
+    ...(dataset === undefined
+      ? []
+      : [{ name: "browser.auspice.json", text: JSON.stringify(dataset) }]),
     ...(secondDataset === undefined
       ? []
-      : [{ name: "second.auspice.json", content: secondDataset }]),
+      : [{ name: "second.auspice.json", text: JSON.stringify(secondDataset) }]),
+    ...files,
   ]
-  await loadDatasets(page, resources, false)
+  await loadFiles(page, resources, sidebar)
   return { page, pageErrors, consoleTimers }
 }
 
@@ -369,12 +514,27 @@ interface ViewerOptions {
   readonly viewport?: { readonly width: number; readonly height: number }
   /** Dataset shown as the second tree of a tanglegram */
   readonly secondDataset?: unknown
+  /** Further input files, e.g. a narrative and its datasets */
+  readonly files?: readonly ViewerFile[]
+  readonly sidebar?: "open" | "closed"
+}
+
+interface ViewerFile {
+  readonly name: string
+  readonly text: string
 }
 
 interface OpenViewer {
   readonly page: Page
   readonly pageErrors: string[]
   readonly consoleTimers: string[]
+}
+
+/** Return the width of the main tree SVG */
+function treeSvgWidth(page: Page): Promise<number> {
+  return page.evaluate(() =>
+    Number(document.getElementById("MainTree")?.closest("svg")?.getAttribute("width")),
+  )
 }
 
 /** Return the names of the tips whose circles lie outside the main tree SVG */
@@ -574,18 +734,17 @@ async function downloadsFromTreeButtons(
   return page.evaluate(() => window.treeButtonDownloads ?? [])
 }
 
-async function loadDatasets(
+async function loadFiles(
   page: Page,
-  datasets: readonly { readonly name: string; readonly content: unknown }[],
-  mapsEnabled: boolean,
+  files: readonly ViewerFile[],
+  sidebar: "open" | "closed",
 ): Promise<void> {
-  const files = datasets.map(({ name, content }) => ({ name, json: JSON.stringify(content) }))
   await page.evaluate(
-    ({ datasetFiles, showMaps }) => {
-      const resources = datasetFiles.map(({ name, json }) => ({
+    ({ inputFiles, sidebarInitialState }) => {
+      const resources = inputFiles.map(({ name, text }) => ({
         uri: `file:///${name}`,
         name,
-        bytes: new TextEncoder().encode(json).buffer,
+        bytes: new TextEncoder().encode(text).buffer,
       }))
       window.postMessage(
         {
@@ -594,14 +753,14 @@ async function loadDatasets(
           resources,
           resourceLimitBytes: 1_000_000,
           largeTreeTipAdvisory: 0,
-          mapsEnabled: showMaps,
-          sidebarInitialState: "open",
+          mapsEnabled: false,
+          sidebarInitialState,
           locale: "en",
         },
         "*",
       )
     },
-    { datasetFiles: files, showMaps: mapsEnabled },
+    { inputFiles: files, sidebarInitialState: sidebar },
   )
   await page.waitForFunction(
     () =>
