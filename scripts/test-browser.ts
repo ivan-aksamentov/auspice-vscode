@@ -27,8 +27,8 @@ const contractDataset = {
   },
 }
 // A tip label margin sized from the first tip (8 characters) cuts the longer names after it.
-// Capital "W" is wider than the margin estimate per character, so the last label extends past the
-// tree panel on screen and must stay complete in the SVG export.
+// Capital "W" is wider than an estimate from the number of characters, so the margin must come from
+// the rendered width of the labels.
 const LONG_TIP_NAME = "HCoV_229E_Portugal_16_2026"
 const WIDE_TIP_NAME = "W".repeat(20)
 const tipLabelDataset = {
@@ -70,6 +70,33 @@ const entropyDataset = {
         ],
       },
       { name: "C", node_attrs: { div: 1 }, branch_attrs: { mutations: { nuc: ["G30A"] } } },
+    ],
+  },
+}
+// Branch labels end just before their node, so the label of a branch next to the root extends
+// towards the left edge of the panel. The divergence axis also puts grid labels at both ends.
+const ROOT_BRANCH_LABEL = "Long clade label next to the root"
+const branchLabelDataset = {
+  version: "v2",
+  meta: {
+    title: "Branch label contract",
+    panels: ["tree"],
+    display_defaults: { branch_label: "clade" },
+  },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: [
+      {
+        name: "near_root",
+        node_attrs: { div: 0.002 },
+        branch_attrs: { labels: { clade: ROOT_BRANCH_LABEL } },
+        children: [
+          { name: "tip_A", node_attrs: { div: 0.14 } },
+          { name: "tip_B", node_attrs: { div: 0.12 } },
+        ],
+      },
+      { name: "tip_C", node_attrs: { div: 0.1 } },
     ],
   },
 }
@@ -130,7 +157,7 @@ const scenarios: readonly Scenario[] = [
     async run() {
       const { page, pageErrors } = await openViewer(tipLabelDataset)
       await page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
-      assert.deepEqual(await tipLabelsPastTreePanel(page), [WIDE_TIP_NAME])
+      assert.deepEqual(await treeLabelsOutsideTreeSvg(page), [])
       assert.deepEqual(await treeLabelsOutsideSvgExport(page), [])
       const downloads = await downloadsFromTreeButtons(page, ["SVG", "JSON", "NWK"])
       assert.deepEqual(
@@ -187,6 +214,15 @@ const scenarios: readonly Scenario[] = [
       // wider panel would stay outside the narrower SVG for most of that time.
       await page.waitForTimeout(150)
       assert.deepEqual(await tipsOutsideTreeSvg(page), [])
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "fits branch labels near the root and the outermost axis labels inside the tree panel",
+    async run() {
+      const { page, pageErrors } = await openViewer(branchLabelDataset)
+      await page.locator("#MainTree .branchLabel").getByText(ROOT_BRANCH_LABEL).waitFor()
+      assert.deepEqual(await treeLabelsOutsideTreeSvg(page), [])
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -275,15 +311,52 @@ function tipsOutsideTreeSvg(page: Page): Promise<string[]> {
   })
 }
 
-/** Return the tip labels that extend past the right edge of the tree panel on screen */
-function tipLabelsPastTreePanel(page: Page): Promise<string[]> {
+/**
+ * Return the visible labels of the main tree that are not completely shown on screen: labels that
+ * extend past the tree SVG, or past the clip path of their group
+ */
+function treeLabelsOutsideTreeSvg(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const tree = document.getElementById("MainTree")
-    const width = Number(tree?.getAttribute("width"))
-    const right = (tree?.closest("svg")?.getBoundingClientRect().left ?? 0) + width
-    return [...document.querySelectorAll("#MainTree .tipLabel")]
-      .filter((label) => label.getBoundingClientRect().right > right)
+    const svg = tree?.closest("svg")?.getBoundingClientRect()
+    if (tree === null || svg === undefined) return ["(no tree)"]
+    const tolerancePx = 0.5
+    return [...tree.querySelectorAll("text")]
+      .filter((label) => {
+        const rect = label.getBoundingClientRect()
+        if (rect.width === 0 || getComputedStyle(label).visibility === "hidden") return false
+        const bounds = [svg, clipBounds(label)].filter((box) => box !== undefined)
+        return bounds.some(
+          (box) =>
+            rect.left < box.left - tolerancePx ||
+            rect.right > box.right + tolerancePx ||
+            rect.top < box.top - tolerancePx ||
+            rect.bottom > box.bottom + tolerancePx,
+        )
+      })
       .map((label) => label.textContent ?? "")
+
+    /** Return the screen box of the clip rectangle of the group that clips the element, if any */
+    function clipBounds(
+      element: Element,
+    ): { left: number; right: number; top: number; bottom: number } | undefined {
+      const group = element.closest("[clip-path]")
+      const clipId = /url\("?#(?<id>[^")]+)"?\)/u.exec(group?.getAttribute("clip-path") ?? "")
+        ?.groups?.["id"]
+      const rect =
+        clipId === undefined ? null : document.getElementById(clipId)?.querySelector("rect")
+      const matrix = group instanceof SVGGraphicsElement ? group.getScreenCTM() : null
+      if (rect === null || rect === undefined || matrix === null) return undefined
+      // Clip paths use the user space of the clipped group, and their own boxes are not rendered
+      const x = Number(rect.getAttribute("x"))
+      const y = Number(rect.getAttribute("y"))
+      const topLeft = new DOMPoint(x, y).matrixTransform(matrix)
+      const bottomRight = new DOMPoint(
+        x + Number(rect.getAttribute("width")),
+        y + Number(rect.getAttribute("height")),
+      ).matrixTransform(matrix)
+      return { left: topLeft.x, right: bottomRight.x, top: topLeft.y, bottom: bottomRight.y }
+    }
   })
 }
 

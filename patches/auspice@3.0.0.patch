@@ -1,3 +1,6 @@
+diff --git a/node_modules/auspice/.bun-tag-18de9ba47a16ef1a b/.bun-tag-18de9ba47a16ef1a
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/auspice/.bun-tag-1a0c3742c35d94b3 b/.bun-tag-1a0c3742c35d94b3
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -418,7 +421,7 @@ index 02d4e40962570749f03200e9c2a3a474414bbd23..36ed0afa5716f69495b7a79402f8bf8e
      <NavBarContainer>
        <Content
 diff --git a/src/components/tree/phyloTree/change.ts b/src/components/tree/phyloTree/change.ts
-index 3a876916302dbb571155123e5de75246d317bde3..8cd81956b9acefb11c30761fd8141c60f804722e 100644
+index 3a876916302dbb571155123e5de75246d317bde3..8ff35fbe14412ee1156e3c4bcd4de851cc473870 100644
 --- a/src/components/tree/phyloTree/change.ts
 +++ b/src/components/tree/phyloTree/change.ts
 @@ -244,6 +244,7 @@ export const modifySVGInStages = function modifySVGInStages(
@@ -449,16 +452,21 @@ index 3a876916302dbb571155123e5de75246d317bde3..8cd81956b9acefb11c30761fd8141c60
  
    /* the logic of converting what react is telling us to change
    and what SVG elements, node properties, svg props we actually change */
-@@ -378,7 +385,7 @@ export const change = function change(
+@@ -378,7 +385,12 @@ export const change = function change(
      svgPropsToUpdate.add("stroke-width");
      nodePropsToModify["stroke-width"] = branchThickness;
    }
 -  if (newDistance || newLayout || updateLayout || zoomIntoClade || svgHasChangedDimensions || changeNodeOrder || changeVisibility) {
-+  if (newDistance || newLayout || updateLayout || zoomIntoClade || svgHasChangedDimensions || changeNodeOrder || changeVisibility || newTipLabelKey) {
++  /* branch labels change the margin on the root side, see `fitBranchLabelsInRootMargin()` */
++  const changeBranchLabels = !!newBranchLabellingKey || showAllBranchLabels !== undefined;
++  if (newBranchLabellingKey) {
++    this.params.branchLabelKey = newBranchLabellingKey === "none" ? undefined : newBranchLabellingKey;
++  }
++  if (newDistance || newLayout || updateLayout || zoomIntoClade || svgHasChangedDimensions || changeNodeOrder || changeVisibility || newTipLabelKey || changeBranchLabels) {
      elemsToUpdate.add(".tip").add(".branch.S").add(".branch.T").add(".branch");
      elemsToUpdate.add(".vaccineCross").add(".vaccineDottedLine").add(".conf");
      elemsToUpdate.add('.branchLabel').add('.tipLabel');
-@@ -398,7 +405,10 @@ export const change = function change(
+@@ -398,7 +410,10 @@ export const change = function change(
      }
  
  
@@ -470,27 +478,28 @@ index 3a876916302dbb571155123e5de75246d317bde3..8cd81956b9acefb11c30761fd8141c60
    if (newTipLabelKey) {
      this.callbacks.tipLabel = makeTipLabelFunc(newTipLabelKey);
      elemsToUpdate.add('.tipLabel'); /* will trigger d3 commands as required */
-@@ -430,7 +440,7 @@ export const change = function change(
+@@ -430,7 +445,7 @@ export const change = function change(
        zoomIntoClade.n.parent.shell;
      applyToChildren(this.zoomNode, (d: PhyloNode) => {d.inView = true;});
    }
 -  if (svgHasChangedDimensions || changeNodeOrder || changeVisibility) {
-+  if (svgHasChangedDimensions || changeNodeOrder || changeVisibility || newTipLabelKey) {
++  if (svgHasChangedDimensions || changeNodeOrder || changeVisibility || newTipLabelKey || changeBranchLabels) {
      this.nodes.forEach((d) => {d.update = true;});
    }
  
-@@ -468,7 +478,8 @@ export const change = function change(
+@@ -468,7 +483,9 @@ export const change = function change(
      svgHasChangedDimensions ||
      streamDefinitionChange ||
      changeVisibility ||
 -    showConfidences
 +    showConfidences ||
-+    newTipLabelKey
++    newTipLabelKey ||
++    changeBranchLabels
    ) {
      this.mapToScreen();
    } else if (this.params.showStreamTrees && (changeColorBy || changeVisibility)) {
 diff --git a/src/components/tree/phyloTree/grid.js b/src/components/tree/phyloTree/grid.js
-index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..8c34be4a2f8c79ce5cae7c9dc73177c42618c54d 100644
+index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..4e6d04c13444c48a3ad6378420a2f0e068029dee 100644
 --- a/src/components/tree/phyloTree/grid.js
 +++ b/src/components/tree/phyloTree/grid.js
 @@ -119,7 +119,9 @@ const computeNumericGridPoints = (minVal, maxVal, layout, nMinorTicks, axis) =>
@@ -504,8 +513,43 @@ index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..8c34be4a2f8c79ce5cae7c9dc73177c4
    const levels = {
      CENTURY: {t: 100, max: undefined},
      DECADE: {t: 10, max: 5}, // i.e. spacing of 50 years is ok, but 60 jumps up to 100y spacing
+@@ -385,6 +387,20 @@ export const addGrid = function addGrid() {
+         .attr("x", xTextPos(this.xScale, layout))
+         .attr("y", yTextPos(this.yScale, layout));
+ 
++  /* x-axis labels are centered on their grid line, so the label of a grid line near the edge of the SVG would be cut
++  off. Align such a label to its grid line on the inner side instead. */
++  if (layout !== "radial") {
++    const svgWidth = parseInt(this.svg.attr("width"), 10);
++    this.groups.gridText.selectAll(".gridText")
++      .filter((d) => d.axis === "x")
++      .each(function alignToSvgEdge() {
++        const x = Number(this.getAttribute("x"));
++        const halfWidth = this.getComputedTextLength() / 2;
++        if (x - halfWidth < 0) this.style.textAnchor = "start";
++        else if (x + halfWidth > svgWidth) this.style.textAnchor = "end";
++      });
++  }
++
+   /* add axis labels */
+   this.groups.axisText.selectAll("*").remove();
+   this.svg.selectAll(".axisText").remove();
+@@ -411,7 +427,12 @@ export const addGrid = function addGrid() {
+         .style("fill", this.params.tickLabelFill)
+         .style("text-anchor", "middle")
+         .attr("x", Math.abs(this.xScale.range()[1]-this.xScale.range()[0]) / 2)
+-        .attr("y", parseInt(this.svg.attr("height"), 10) - 1);
++        .attr("y", parseInt(this.svg.attr("height"), 10) - 1)
++        .each(function keepDescendersInsideSvg() {
++          /* the baseline sits 1px above the bottom edge, which cuts off descenders (e.g. the "g" of "Divergence") */
++          const overflow = this.getBBox().y + this.getBBox().height - parseInt(this.ownerSVGElement.getAttribute("height"), 10);
++          if (overflow > 0) this.setAttribute("y", Number(this.getAttribute("y")) - overflow);
++        });
+   }
+   if (yAxisLabel) {
+     this.groups.axisText
 diff --git a/src/components/tree/phyloTree/labels.js b/src/components/tree/phyloTree/labels.js
-index d37f293a1be1dadb39303d4430cb4e0b3b50331c..063867d54d348390314113fde6e2f5da4ce1e68f 100644
+index d37f293a1be1dadb39303d4430cb4e0b3b50331c..f2636cb2c815d13536aa8e6b4f1894ca01eadf81 100644
 --- a/src/components/tree/phyloTree/labels.js
 +++ b/src/components/tree/phyloTree/labels.js
 @@ -30,6 +30,7 @@ export const updateTipLabels = function updateTipLabels(dt) {
@@ -516,29 +560,76 @@ index d37f293a1be1dadb39303d4430cb4e0b3b50331c..063867d54d348390314113fde6e2f5da
        this.groups.tipLabels
          .selectAll(".tipLabel")
          .data(inViewVisibleTips)
+@@ -56,7 +57,7 @@ export const removeTipLabels = function removeTipLabels() {
+  * @param {str} key e.g. "aa" or "clade"
+  * @return {str} font size of the branch label, e.g. "12px"
+  */
+-const branchLabelSize = (key) => {
++export const branchLabelSize = (key) => {
+   if (key === "aa") return "10px";
+   return "14px";
+ };
+@@ -65,7 +66,7 @@ const branchLabelSize = (key) => {
+  * @param {str} key e.g. "aa" or "clade"
+  * @return {str} font weight of the branch label, e.g. "500"
+  */
+-const branchLabelFontWeight = (key) => {
++export const branchLabelFontWeight = (key) => {
+   if (key === "aa") return "500";
+   return "700";
+ };
+@@ -79,7 +80,7 @@ const branchLabelFontWeight = (key) => {
+  *                This fn will return "visible" or "hidden".
+  *                NOTE: the fn should only be provided nodes which have a label.
+  */
+-const createBranchLabelVisibility = (key, showAll, layout, totalTipsInView) => (d) => {
++export const createBranchLabelVisibility = (key, showAll, layout, totalTipsInView) => (d) => {
+   if (d.visibility !== NODE_VISIBLE) return "hidden";
+   if (showAll) return "visible";
+   const magicTipFractionToShowBranchLabel = 0.03;
 diff --git a/src/components/tree/phyloTree/layouts.ts b/src/components/tree/phyloTree/layouts.ts
-index a1537c670dfd460d3399961a7945f44dad6de9a5..31747990c1a73011e72acfbaf544ac8e0f187613 100644
+index a1537c670dfd460d3399961a7945f44dad6de9a5..2ad9299f5e68654842c303137d7a67bbd0266be5 100644
 --- a/src/components/tree/phyloTree/layouts.ts
 +++ b/src/components/tree/phyloTree/layouts.ts
-@@ -7,7 +7,7 @@ import { stemParent, nodeOrdering } from "./helpers";
+@@ -7,7 +7,9 @@ import { stemParent, nodeOrdering } from "./helpers";
  import { numDate } from "../../../util/colorHelpers";
  import { Layout, ScatterVariables } from "../../../reducers/controls";
  import { ReduxNode, colorBySymbol } from "../../../reducers/tree/types";
 -import { Distance, Params, PhyloNode, PhyloTreeType, Ripple } from "./types";
 +import { Distance, Params, PhyloNode, PhyloTreeType, Ripple, TipLabelCallback } from "./types";
++import { branchLabelFontWeight, branchLabelSize, createBranchLabelVisibility } from "./labels";
++import { NODE_VISIBLE } from "../../../util/globals";
  
  /**
   * assigns the attribute this.layout and calls the function that
-@@ -349,7 +349,7 @@ export const mapToScreen = function mapToScreen(this: PhyloTreeType): void {
+@@ -345,13 +347,15 @@ export const setScales = function setScales(this: PhyloTreeType): void {
+ export const mapToScreen = function mapToScreen(this: PhyloTreeType): void {
+   timerStart("mapToScreen");
+   const inViewTerminalNodes = this.nodes.filter((d) => !d.n.hasChildren).filter((d) => d.inView);
++  const measureLabel = createLabelMeasure(this.svg.node());
+ 
    /* set up space (padding) for axes etc, as we don't want the branches & tips to occupy the entire SVG! */
    this.margins = {
      left: (this.layout==="scatter" || this.layout==="clock") ? 40 : 5, // space for y-axis label
 -    right: 5 + getTipLabelPadding(this.params, inViewTerminalNodes),
-+    right: 5 + getTipLabelPadding(this.params, inViewTerminalNodes, this.callbacks.tipLabel),
++    right: 5 + getTipLabelPadding(this.params, inViewTerminalNodes, this.callbacks.tipLabel, measureLabel),
      top: this.layout==="radial" ? 10 : 15, // avoid tips rendering behind legend
-     bottom: 35 // space for x-axis labels
+-    bottom: 35 // space for x-axis labels
++    bottom: 35, // space for x-axis labels
++    branchLabels: 0
    };
-@@ -628,9 +628,14 @@ function jitter(
+ 
+   /* construct & set the range of the x & y scales */
+@@ -473,6 +477,8 @@ export const mapToScreen = function mapToScreen(this: PhyloTreeType): void {
+   this.xScale.domain(xDomain);
+   this.yScale.domain(yDomain);
+ 
++  fitBranchLabelsInRootMargin.call(this, measureLabel);
++
+   const hiddenYPosition = this.yScale.range()[1] + 100;
+   const hiddenXPosition = this.xScale.range()[0] - 100;
+ 
+@@ -628,9 +634,17 @@ function jitter(
  }
  
  
@@ -551,10 +642,13 @@ index a1537c670dfd460d3399961a7945f44dad6de9a5..31747990c1a73011e72acfbaf544ac8e
 +   * that the margin is sized from the labels actually on screen rather than the
 +   * strain names. Varies with `controls.tipLabelKey`. */
 +  tipLabel: TipLabelCallback,
++
++  /** width in pixels of a label as rendered; defaults to an estimate from the number of characters */
++  measureLabel: LabelMeasure = estimateLabelWidth,
  ): number {
    let padBy = 0;
    if (inViewTerminalNodes.length < params.tipLabelBreakL1) {
-@@ -643,11 +648,8 @@ function getTipLabelPadding(
+@@ -643,15 +657,92 @@ function getTipLabelPadding(
        fontSize = params.tipLabelFontSizeL3;
      }
  
@@ -563,10 +657,94 @@ index a1537c670dfd460d3399961a7945f44dad6de9a5..31747990c1a73011e72acfbaf544ac8e
 -        padBy = 0.65 * d.n.name.length * fontSize;
 -      }
 -    });
-+    const longestLabel = Math.max(0, ...inViewTerminalNodes.map((d) => String(tipLabel(d) ?? "").length));
-+    padBy = 0.65 * longestLabel * fontSize;
++    /* labels start `tipLabelPadX` right of their tip, see `updateTipLabels()` */
++    const widestLabel = Math.max(0, ...inViewTerminalNodes.map((d) => measureLabel(String(tipLabel(d) ?? ""), fontSize, 400)));
++    padBy = measureLabel === estimateLabelWidth ? widestLabel : widestLabel + params.tipLabelPadX;
    }
    return padBy;
+ }
+ 
++/** Width in pixels of a label in a font of the given size and weight, in the font family of the tree unless given */
++export type LabelMeasure = (text: string, fontSize: number, fontWeight: number, fontFamily?: string) => number
++
++/** Estimate of the label width from the number of characters, for environments that cannot measure text */
++export const estimateLabelWidth: LabelMeasure = (text, fontSize) => 0.65 * text.length * fontSize;
++
++let measureContext: CanvasRenderingContext2D | null | undefined;
++
++/**
++ * Measure labels as the browser renders them in the tree SVG, so that the margins fit labels with wide characters
++ * (e.g. "W") or narrow ones. Labels without their own font family use the family of the SVG. Where no canvas is
++ * available (e.g. in jsdom), fall back to the estimate from the number of characters.
++ */
++function createLabelMeasure(svg: Element | null): LabelMeasure {
++  if (measureContext === undefined) {
++    measureContext = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
++  }
++  const context = measureContext;
++  const svgFontFamily = svg ? window.getComputedStyle(svg).fontFamily : "";
++  if (!context || !svgFontFamily) return estimateLabelWidth;
++  return (text, fontSize, fontWeight, fontFamily = svgFontFamily) => {
++    context.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
++    return context.measureText(text).width;
++  };
++}
++
++/**
++ * In the rectangular layout, branch labels end just before their node on the root side, so the label of a branch near
++ * the root can extend past the edge of the SVG and get clipped. Widen the margin on the root side just enough for the
++ * visible labels to fit inside the SVG, and record the added width so that the clip mask covers it.
++ */
++function fitBranchLabelsInRootMargin(this: PhyloTreeType, measureLabel: LabelMeasure): void {
++  const key = this.params.branchLabelKey;
++  if (this.layout !== "rect" || !key || key === "none") return;
++
++  const width = parseInt(this.svg.attr("width"), 10);
++  const isMirrored = this.params.orientation[0] < 0;
++  /* x range from the root side to the far side */
++  const [rangeStart, rangeEnd] = this.xScale.range();
++  const span = rangeEnd - rangeStart;
++  if (!span) return;
++  /* distance from the SVG edge on the root side to the far end of the x range */
++  const farEnd = isMirrored ? width - rangeEnd : rangeEnd;
++
++  const fontSize = parseInt(branchLabelSize(key), 10);
++  const fontWeight = parseInt(branchLabelFontWeight(key), 10);
++  /* Labels hidden by filters count too, so that filtering does not move the tree */
++  const isLabelShown = createBranchLabelVisibility(key, this.params.showAllBranchLabels, this.layout, this.zoomNode.n.tipCount);
++  const labelGap = 5; // labels end this far from their node, see `drawBranchLabels()`
++
++  const margin = isMirrored ? this.margins.right : this.margins.left;
++  let fitted = margin;
++  this.nodes.forEach((d) => {
++    const label = d.inView && d.n.branch_attrs?.labels?.[key];
++    if (!label || isLabelShown({ ...d, visibility: NODE_VISIBLE }) !== "visible") return;
++    /* position of the node as a fraction of the x range, which does not depend on the margin */
++    const fraction = (this.xScale(d.x) - rangeStart) / span;
++    if (fraction >= 1) return;
++    const labelWidth = measureLabel(String(label), fontSize, fontWeight, this.params.branchLabelFont);
++    /* the label starts `margin + fraction * (farEnd - margin) - labelGap - labelWidth` from the root side edge,
++    which must not be negative */
++    fitted = Math.max(fitted, (labelGap + labelWidth - fraction * farEnd) / (1 - fraction));
++  });
++  /* a label far from the root must not squeeze the tree */
++  fitted = Math.min(fitted, farEnd / 4);
++
++  if (fitted > margin) {
++    this.margins.branchLabels = fitted - margin;
++    if (isMirrored) {
++      this.margins.right = fitted;
++      this.xScale.range([width - fitted, rangeEnd]);
++    } else {
++      this.margins.left = fitted;
++      this.xScale.range([fitted, rangeEnd]);
++    }
++    this.setClipMask();
++  }
++}
++
+ function leafWeight(node: ReduxNode): number {
+   return node.tipCount + 0.15*(node.fullTipCount-node.tipCount);
  }
 diff --git a/src/components/tree/phyloTree/phyloTree.ts b/src/components/tree/phyloTree/phyloTree.ts
 index d4f928d487df9ad1b681caf4bedbd1c57e980c21..9ed15b2a8658d56cc31416094f60c4132f6d795f 100644
@@ -589,7 +767,7 @@ index d4f928d487df9ad1b681caf4bedbd1c57e980c21..9ed15b2a8658d56cc31416094f60c413
  /* D R A W I N G    F U N C T I O N S */
  PhyloTree.prototype.setClipMask = renderers.setClipMask;
 diff --git a/src/components/tree/phyloTree/renderers.ts b/src/components/tree/phyloTree/renderers.ts
-index 367f3ec3a5b42c2f9db045300e6e74432247e54d..97d29f9939c815cea51c7e47714aa65674cc5a45 100644
+index 367f3ec3a5b42c2f9db045300e6e74432247e54d..3ce4bdb0fe768b873569582dc1f65774a8a8e3de 100644
 --- a/src/components/tree/phyloTree/renderers.ts
 +++ b/src/components/tree/phyloTree/renderers.ts
 @@ -421,6 +421,13 @@ export const clearSVG = function clearSVG(this: PhyloTreeType): void {
@@ -606,8 +784,21 @@ index 367f3ec3a5b42c2f9db045300e6e74432247e54d..97d29f9939c815cea51c7e47714aa656
  
  /* Due to errors rendering gradients on SVG branches on some browsers/OSs which would
  cause the branches to not appear, we're falling back to the previous solution which
+@@ -513,8 +520,10 @@ export const setClipMask = function setClipMask(this: PhyloTreeType): void {
+   // browsers don't like. See <https://github.com/nextstrain/auspice/issues/1755>
+   let [xMin, xMax] = this.xScale.range();
+   if (parseInt(xMin, 10)>parseInt(xMax, 10)) [xMin, xMax] = [xMax, xMin];
+-  const x0 = xMin - 5;
+-  const width = xMax - xMin + 20;  // RHS overflow is not problematic
++  /* branch labels can extend into the margin on the root side, which is the left side unless the tree is mirrored */
++  const branchLabelMargin = this.margins.branchLabels ?? 0;
++  const x0 = xMin - 5 - (this.params.orientation[0] > 0 ? branchLabelMargin : 0);
++  const width = xMax - xMin + 20 + branchLabelMargin;  // RHS overflow is not problematic
+   const y0 = yMin - 15;            // some overflow at top is ok
+   const height = yMax - yMin + 20; // extra padding to allow tips & lowest major axis line to render
+ 
 diff --git a/src/components/tree/phyloTree/types.ts b/src/components/tree/phyloTree/types.ts
-index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..bd4ad82d8f7d4aeb6c952316ac187fe3b3e8fcd6 100644
+index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..1b0f0d12a97c5462a554d959fe1f06d6e11a0d2a 100644
 --- a/src/components/tree/phyloTree/types.ts
 +++ b/src/components/tree/phyloTree/types.ts
 @@ -38,6 +38,9 @@ export interface Regression {
@@ -641,6 +832,15 @@ index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..bd4ad82d8f7d4aeb6c952316ac187fe3
    confidencesInSVG: boolean
    dateRange: [number, number]
    distance: Distance
+@@ -295,6 +300,8 @@ export interface PhyloTreeType {
+     left: number
+     right: number
+     top: number
++    /** part of the margin on the root side that makes room for branch labels; the clip mask extends over it */
++    branchLabels: number
+   }
+   measurementsColorGrouping: string | undefined
+   modifySVG: typeof modifySVG
 diff --git a/src/components/tree/tangle/index.js b/src/components/tree/tangle/index.js
 index 633c0d018c5947ddec85ca057a7e2df53d85cd1d..6b4c6cbdf71b396948dea2035dbbd2e0368e6049 100644
 --- a/src/components/tree/tangle/index.js
