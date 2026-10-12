@@ -100,6 +100,16 @@ const branchLabelDataset = {
     ],
   },
 }
+// A tree with short tip names, for a tanglegram with the tip label dataset
+const shortNameDataset = {
+  version: "v2",
+  meta: { title: "Short names", panels: ["tree"] },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: ["A", "B", "C"].map((name) => ({ name, node_attrs: { div: 1 } })),
+  },
+}
 // A time tree whose tip names are long enough to leave little room for the time axis
 const timeTreeDataset = {
   version: "v2",
@@ -226,6 +236,20 @@ const scenarios: readonly Scenario[] = [
       assert.deepEqual(pageErrors, [])
     },
   },
+  {
+    name: "clips each tree of a tanglegram to its own panel",
+    async run() {
+      // The tip label margin of each tree follows its own labels, so the mirrored second tree,
+      // whose names are short, extends further towards its root side than the first tree
+      const { page, pageErrors } = await openViewer(tipLabelDataset, {
+        secondDataset: shortNameDataset,
+      })
+      await page.locator("#SecondTree .tip").first().waitFor()
+      assert.deepEqual(await branchesOutsideTheirClip(page, "SecondTree"), [])
+      assert.deepEqual(await branchesOutsideTheirClip(page, "MainTree"), [])
+      assert.deepEqual(pageErrors, [])
+    },
+  },
 ]
 try {
   for (const scenario of scenarios) {
@@ -257,7 +281,7 @@ function browserHtml(): string {
 
 async function openViewer(
   dataset: unknown,
-  { viewport = { width: 1_400, height: 900 } }: ViewerOptions = {},
+  { viewport = { width: 1_400, height: 900 }, secondDataset }: ViewerOptions = {},
 ): Promise<OpenViewer> {
   const page = await browser.newPage({ viewport })
   const pageErrors: string[] = []
@@ -278,7 +302,13 @@ async function openViewer(
           typeof value === "object" && value !== null && "type" in value && value.type === "ready",
       ) === true,
   )
-  await loadDataset(page, dataset, false)
+  const resources = [
+    { name: "browser.auspice.json", content: dataset },
+    ...(secondDataset === undefined
+      ? []
+      : [{ name: "second.auspice.json", content: secondDataset }]),
+  ]
+  await loadDatasets(page, resources, false)
   return { page, pageErrors, consoleTimers }
 }
 
@@ -289,6 +319,8 @@ interface Scenario {
 
 interface ViewerOptions {
   readonly viewport?: { readonly width: number; readonly height: number }
+  /** Dataset shown as the second tree of a tanglegram */
+  readonly secondDataset?: unknown
 }
 
 interface OpenViewer {
@@ -309,6 +341,34 @@ function tipsOutsideTreeSvg(page: Page): Promise<string[]> {
       })
       .map((tip) => tip.id)
   })
+}
+
+/**
+ * Return the branches of a tree that extend past the clip rectangle their group refers to. A branch
+ * outside the rectangle of its own tree is cut on screen.
+ */
+function branchesOutsideTheirClip(page: Page, treeId: string): Promise<string[]> {
+  return page.evaluate((id) => {
+    const tolerancePx = 0.5
+    return [...document.querySelectorAll(`#${id} .branch`)]
+      .filter((branch) => {
+        const group = branch.closest("[clip-path]")
+        const clipId = /url\("?#(?<id>[^")]+)"?\)/u.exec(group?.getAttribute("clip-path") ?? "")
+          ?.groups?.["id"]
+        const rect =
+          clipId === undefined ? null : document.getElementById(clipId)?.querySelector("rect")
+        const matrix = group instanceof SVGGraphicsElement ? group.getScreenCTM() : null
+        if (rect === null || rect === undefined || matrix === null) return false
+        const left = new DOMPoint(Number(rect.getAttribute("x")), 0).matrixTransform(matrix).x
+        const right = new DOMPoint(
+          Number(rect.getAttribute("x")) + Number(rect.getAttribute("width")),
+          0,
+        ).matrixTransform(matrix).x
+        const box = branch.getBoundingClientRect()
+        return box.width > 0 && (box.left < left - tolerancePx || box.right > right + tolerancePx)
+      })
+      .map((branch) => branch.id)
+  }, treeId)
 }
 
 /**
@@ -466,16 +526,24 @@ async function downloadsFromTreeButtons(
   return page.evaluate(() => window.treeButtonDownloads ?? [])
 }
 
-async function loadDataset(page: Page, dataset: unknown, mapsEnabled: boolean): Promise<void> {
-  const content = JSON.stringify(dataset)
+async function loadDatasets(
+  page: Page,
+  datasets: readonly { readonly name: string; readonly content: unknown }[],
+  mapsEnabled: boolean,
+): Promise<void> {
+  const files = datasets.map(({ name, content }) => ({ name, json: JSON.stringify(content) }))
   await page.evaluate(
-    ({ datasetJson, showMaps }) => {
-      const bytes = new TextEncoder().encode(datasetJson).buffer
+    ({ datasetFiles, showMaps }) => {
+      const resources = datasetFiles.map(({ name, json }) => ({
+        uri: `file:///${name}`,
+        name,
+        bytes: new TextEncoder().encode(json).buffer,
+      }))
       window.postMessage(
         {
           type: "load",
           generation: 1,
-          resources: [{ uri: "file:///browser.auspice.json", name: "browser.auspice.json", bytes }],
+          resources,
           resourceLimitBytes: 1_000_000,
           largeTreeTipAdvisory: 0,
           mapsEnabled: showMaps,
@@ -485,7 +553,7 @@ async function loadDataset(page: Page, dataset: unknown, mapsEnabled: boolean): 
         "*",
       )
     },
-    { datasetJson: content, showMaps: mapsEnabled },
+    { datasetFiles: files, showMaps: mapsEnabled },
   )
   await page.waitForFunction(
     () =>

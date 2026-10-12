@@ -4,6 +4,9 @@ index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2
 diff --git a/node_modules/auspice/.bun-tag-1a0c3742c35d94b3 b/.bun-tag-1a0c3742c35d94b3
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/node_modules/auspice/.bun-tag-29b56c02aa611940 b/.bun-tag-29b56c02aa611940
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/auspice/.bun-tag-33dd6a5242cfeb13 b/.bun-tag-33dd6a5242cfeb13
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -499,10 +502,33 @@ index 3a876916302dbb571155123e5de75246d317bde3..8ff35fbe14412ee1156e3c4bcd4de851
      this.mapToScreen();
    } else if (this.params.showStreamTrees && (changeColorBy || changeVisibility)) {
 diff --git a/src/components/tree/phyloTree/grid.js b/src/components/tree/phyloTree/grid.js
-index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..4e6d04c13444c48a3ad6378420a2f0e068029dee 100644
+index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..ec20ff8446081f3a617cc8d2236d7f02df921e76 100644
 --- a/src/components/tree/phyloTree/grid.js
 +++ b/src/components/tree/phyloTree/grid.js
-@@ -119,7 +119,9 @@ const computeNumericGridPoints = (minVal, maxVal, layout, nMinorTicks, axis) =>
+@@ -22,7 +22,8 @@ export const hideGrid = function hideGrid() {
+   }
+ };
+ 
+-const addSVGGroupsIfNeeded = (groups, svg) => {
++/* each tree has its own clip path, because clip path IDs are global to the document and a tanglegram shows two trees */
++const addSVGGroupsIfNeeded = (groups, svg, treeId) => {
+   if (!("temporalWindow" in groups)) {
+     groups.temporalWindow = svg.append("g").attr("id", "temporalWindow");
+ 
+@@ -33,10 +34,10 @@ const addSVGGroupsIfNeeded = (groups, svg) => {
+       .attr('class', 'temporalWindowEnd');
+   }
+   if (!("majorGrid" in groups)) {
+-    groups.majorGrid = svg.append("g").attr("id", "majorGrid").attr("clip-path", "url(#treeClip)");
++    groups.majorGrid = svg.append("g").attr("id", "majorGrid").attr("clip-path", `url(#treeClip-${treeId})`);
+   }
+   if (!("minorGrid" in groups)) {
+-    groups.minorGrid = svg.append("g").attr("id", "minorGrid").attr("clip-path", "url(#treeClip)");
++    groups.minorGrid = svg.append("g").attr("id", "minorGrid").attr("clip-path", `url(#treeClip-${treeId})`);
+   }
+   if (!("gridText" in groups)) {
+     groups.gridText = svg.append("g").attr("id", "gridText");
+@@ -119,7 +120,9 @@ const computeNumericGridPoints = (minVal, maxVal, layout, nMinorTicks, axis) =>
  const calculateTemporalGridSeperation = (timeRange, pxAvailable) => {
    const [majorStep, minorStep] = [{unit: "DAY", n: 1}, {unit: "DAY", n: 0}];
    const minPxBetweenMajorGrid = (pxAvailable < 1000 ? 130 : 180);
@@ -513,7 +539,16 @@ index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..4e6d04c13444c48a3ad6378420a2f0e0
    const levels = {
      CENTURY: {t: 100, max: undefined},
      DECADE: {t: 10, max: 5}, // i.e. spacing of 50 years is ok, but 60 jumps up to 100y spacing
-@@ -385,6 +387,20 @@ export const addGrid = function addGrid() {
+@@ -219,7 +222,7 @@ export const computeTemporalGridPoints = (numDateMin, numDateMax, pxAvailable, a
+  */
+ export const addGrid = function addGrid() {
+   const layout = this.layout;
+-  addSVGGroupsIfNeeded(this.groups, this.svg);
++  addSVGGroupsIfNeeded(this.groups, this.svg, this.id);
+   if (layout==="unrooted") return;
+   timerStart("addGrid");
+ 
+@@ -385,6 +388,20 @@ export const addGrid = function addGrid() {
          .attr("x", xTextPos(this.xScale, layout))
          .attr("y", yTextPos(this.yScale, layout));
  
@@ -534,7 +569,7 @@ index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..4e6d04c13444c48a3ad6378420a2f0e0
    /* add axis labels */
    this.groups.axisText.selectAll("*").remove();
    this.svg.selectAll(".axisText").remove();
-@@ -411,7 +427,12 @@ export const addGrid = function addGrid() {
+@@ -411,7 +428,12 @@ export const addGrid = function addGrid() {
          .style("fill", this.params.tickLabelFill)
          .style("text-anchor", "middle")
          .attr("x", Math.abs(this.xScale.range()[1]-this.xScale.range()[0]) / 2)
@@ -549,7 +584,7 @@ index ab17e1a750ff08575d477a5f7e042fa2134f5d3d..4e6d04c13444c48a3ad6378420a2f0e0
    if (yAxisLabel) {
      this.groups.axisText
 diff --git a/src/components/tree/phyloTree/labels.js b/src/components/tree/phyloTree/labels.js
-index d37f293a1be1dadb39303d4430cb4e0b3b50331c..f2636cb2c815d13536aa8e6b4f1894ca01eadf81 100644
+index d37f293a1be1dadb39303d4430cb4e0b3b50331c..ab57c4d3073f474bffc00846d436894af10f4d16 100644
 --- a/src/components/tree/phyloTree/labels.js
 +++ b/src/components/tree/phyloTree/labels.js
 @@ -30,6 +30,7 @@ export const updateTipLabels = function updateTipLabels(dt) {
@@ -587,6 +622,15 @@ index d37f293a1be1dadb39303d4430cb4e0b3b50331c..f2636cb2c815d13536aa8e6b4f1894ca
    if (d.visibility !== NODE_VISIBLE) return "hidden";
    if (showAll) return "visible";
    const magicTipFractionToShowBranchLabel = 0.03;
+@@ -135,7 +136,7 @@ export const drawBranchLabels = function drawBranchLabels(key) {
+   const visibility = createBranchLabelVisibility(key, this.params.showAllBranchLabels, this.layout, this.zoomNode.n.tipCount);
+ 
+   if (!("branchLabels" in this.groups)) {
+-    this.groups.branchLabels = this.svg.append("g").attr("id", "branchLabels").attr("clip-path", "url(#treeClip)");
++    this.groups.branchLabels = this.svg.append("g").attr("id", "branchLabels").attr("clip-path", `url(#treeClip-${this.id})`);
+   }
+ 
+   const nodes = (this.params.showStreamTrees ? this.nodes.filter((d) => !d.n.inStream) : this.nodes)
 diff --git a/src/components/tree/phyloTree/layouts.ts b/src/components/tree/phyloTree/layouts.ts
 index a1537c670dfd460d3399961a7945f44dad6de9a5..2ad9299f5e68654842c303137d7a67bbd0266be5 100644
 --- a/src/components/tree/phyloTree/layouts.ts
@@ -767,9 +811,45 @@ index d4f928d487df9ad1b681caf4bedbd1c57e980c21..9ed15b2a8658d56cc31416094f60c413
  /* D R A W I N G    F U N C T I O N S */
  PhyloTree.prototype.setClipMask = renderers.setClipMask;
 diff --git a/src/components/tree/phyloTree/renderers.ts b/src/components/tree/phyloTree/renderers.ts
-index 367f3ec3a5b42c2f9db045300e6e74432247e54d..3ce4bdb0fe768b873569582dc1f65774a8a8e3de 100644
+index 367f3ec3a5b42c2f9db045300e6e74432247e54d..2f59340b6208d4314919d29598d42c3e5454eaa1 100644
 --- a/src/components/tree/phyloTree/renderers.ts
 +++ b/src/components/tree/phyloTree/renderers.ts
+@@ -221,7 +221,7 @@ export const drawTips = function drawTips(this: PhyloTreeType): void {
+   timerStart("drawTips");
+   const params = this.params;
+   if (!("tips" in this.groups)) {
+-    this.groups.tips = this.svg.append("g").attr("id", "tips").attr("clip-path", "url(#treeClip)");
++    this.groups.tips = this.svg.append("g").attr("id", "tips").attr("clip-path", `url(#treeClip-${this.id})`);
+   }
+ 
+   const nodes = (this.params.showStreamTrees ? this.nodes.filter((d) => !d.n.inStream) : this.nodes)
+@@ -304,7 +304,7 @@ export const drawBranches = function drawBranches(this: PhyloTreeType): void {
+   /* PART 1: draw the branch Ts (i.e. the bit connecting nodes parent branch ends to child branch beginnings)
+   Only rectangular & radial trees have this, so we remove it for clock / unrooted layouts */
+   if (!("branchTee" in this.groups)) {
+-    this.groups.branchTee = this.svg.append("g").attr("id", "branchTee").attr("clip-path", "url(#treeClip)");
++    this.groups.branchTee = this.svg.append("g").attr("id", "branchTee").attr("clip-path", `url(#treeClip-${this.id})`);
+   }
+   if (this.layout === "clock" || this.layout === "scatter" || this.layout === "unrooted") {
+     this.groups.branchTee.selectAll("*").remove();
+@@ -339,7 +339,7 @@ export const drawBranches = function drawBranches(this: PhyloTreeType): void {
+   this.updateColorBy();
+   /* PART 2b: Draw the stems */
+   if (!("branchStem" in this.groups)) {
+-    this.groups.branchStem = this.svg.append("g").attr("id", "branchStem").attr("clip-path", "url(#treeClip)");
++    this.groups.branchStem = this.svg.append("g").attr("id", "branchStem").attr("clip-path", `url(#treeClip-${this.id})`);
+   }
+   this.groups.branchStem
+     .selectAll('.branch')
+@@ -382,7 +382,7 @@ export const drawRegression = function drawRegression(this: PhyloTreeType): void
+     " L " + this.xScale.range()[1].toString() + " " + rightY.toString();
+ 
+   if (!("regression" in this.groups)) {
+-    this.groups.regression = this.svg.append("g").attr("id", "regression").attr("clip-path", "url(#treeClip)");
++    this.groups.regression = this.svg.append("g").attr("id", "regression").attr("clip-path", `url(#treeClip-${this.id})`);
+   }
+ 
+   this.groups.regression
 @@ -421,6 +421,13 @@ export const clearSVG = function clearSVG(this: PhyloTreeType): void {
    this.svg.selectAll("*").remove();
  };
@@ -784,7 +864,7 @@ index 367f3ec3a5b42c2f9db045300e6e74432247e54d..3ce4bdb0fe768b873569582dc1f65774
  
  /* Due to errors rendering gradients on SVG branches on some browsers/OSs which would
  cause the branches to not appear, we're falling back to the previous solution which
-@@ -513,8 +520,10 @@ export const setClipMask = function setClipMask(this: PhyloTreeType): void {
+@@ -513,15 +520,17 @@ export const setClipMask = function setClipMask(this: PhyloTreeType): void {
    // browsers don't like. See <https://github.com/nextstrain/auspice/issues/1755>
    let [xMin, xMax] = this.xScale.range();
    if (parseInt(xMin, 10)>parseInt(xMax, 10)) [xMin, xMax] = [xMax, xMin];
@@ -797,6 +877,14 @@ index 367f3ec3a5b42c2f9db045300e6e74432247e54d..3ce4bdb0fe768b873569582dc1f65774
    const y0 = yMin - 15;            // some overflow at top is ok
    const height = yMax - yMin + 20; // extra padding to allow tips & lowest major axis line to render
  
+   if (!this.groups.clipPath) {
+     this.groups.clipPath = this.svg.append("g").attr("id", "clipGroup");
+     this.groups.clipPath.append("clipPath")
+-        .attr("id", "treeClip")
++        .attr("id", `treeClip-${this.id}`)
+       .append("rect")
+         .attr("x", x0)
+         .attr("y", y0)
 diff --git a/src/components/tree/phyloTree/types.ts b/src/components/tree/phyloTree/types.ts
 index 9bfce8810171de0c5061d6b2fb37342d715d8f1c..1b0f0d12a97c5462a554d959fe1f06d6e11a0d2a 100644
 --- a/src/components/tree/phyloTree/types.ts
