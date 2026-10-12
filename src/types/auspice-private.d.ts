@@ -128,7 +128,7 @@ declare module "@auspice/actions/filesDropped/filesDropped" {
   ): import("redux-thunk").ThunkAction<Promise<void>, unknown, unknown, import("redux").AnyAction>
 }
 
-declare module "auspice/cli/server/convertJsonSchemas.js" {
+declare module "auspice/cli-build/server/convertJsonSchemas.js" {
   export function convertFromV1(input: {
     readonly tree: Record<string, unknown>
     readonly meta: Record<string, unknown>

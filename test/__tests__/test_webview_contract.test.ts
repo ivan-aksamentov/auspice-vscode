@@ -46,9 +46,9 @@ describe("webview contract", () => {
       viewerScale: 1,
     })
 
-    expect(actual).toContain(
-      "connect-src https://*.mapbox.com https://*.mapbox.cn https://*.openstreetmap.org",
-    )
+    // Auspice's default map style loads every tile, glyph and sprite from OpenFreeMap.
+    expect(actual).toContain("connect-src https://tiles.openfreemap.org;")
+    expect(actual).toContain("img-src vscode-webview: data: blob: https://tiles.openfreemap.org;")
   })
 
   test("test_webview_html_injects_viewer_scale_to_counteract_editor_zoom", () => {

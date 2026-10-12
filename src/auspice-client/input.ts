@@ -1,4 +1,4 @@
-import { convertFromV1 } from "auspice/cli/server/convertJsonSchemas.js"
+import { convertFromV1 } from "auspice/cli-build/server/convertJsonSchemas.js"
 import { z } from "zod"
 
 import {

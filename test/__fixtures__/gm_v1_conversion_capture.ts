@@ -1,6 +1,6 @@
 import { resolve } from "node:path"
 
-import { convertFromV1 } from "auspice/cli/server/convertJsonSchemas.js"
+import { convertFromV1 } from "auspice/cli-build/server/convertJsonSchemas.js"
 import { z } from "zod"
 
 const fixtureDirectory = import.meta.dirname

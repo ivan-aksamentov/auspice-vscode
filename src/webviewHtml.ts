@@ -1,11 +1,15 @@
+// Tile server of the map style that Auspice ships (`src/util/map-styles.json`)
+const MAP_TILE_ORIGIN = "https://tiles.openfreemap.org"
+
 export function renderWebviewHtml(options: WebviewHtmlOptions): string {
-  const mapSources = options.mapsEnabled
-    ? " https://*.mapbox.com https://*.mapbox.cn https://*.openstreetmap.org"
-    : ""
+  // Auspice draws the map with MapLibre from OpenFreeMap vector tiles. MapLibre fetches the
+  // tiles, glyphs and sprites, and may decode raster tiles through `blob:` image URLs.
+  const mapSources = options.mapsEnabled ? ` ${MAP_TILE_ORIGIN}` : ""
+  const mapImageSources = options.mapsEnabled ? ` blob:${mapSources}` : ""
   const connectSources = options.mapsEnabled ? mapSources.trim() : "'none'"
   const csp = [
     "default-src 'none'",
-    `img-src ${options.cspSource} data:${mapSources}`,
+    `img-src ${options.cspSource} data:${mapImageSources}`,
     `font-src ${options.cspSource} data:`,
     `style-src ${options.cspSource} 'unsafe-inline'`,
     `script-src 'nonce-${options.nonce}' 'strict-dynamic'`,

@@ -49,7 +49,7 @@
     "release": "bun run scripts/release.ts"
   },
   "dependencies": {
-    "auspice": "2.73.0",
+    "auspice": "3.0.0",
     "i18next": "19.9.2",
     "phylotree": "2.6.0",
     "react": "16.14.0",
@@ -288,7 +288,7 @@
           "type": "boolean",
           "default": false,
           "scope": "resource",
-          "description": "Show maps and allow their background tiles to load from external providers. Dataset files always remain local. Applies when an Auspice tab is reopened or reloaded."
+          "description": "Show maps and allow their background tiles to load from OpenFreeMap (tiles.openfreemap.org). Dataset files always remain local. Applies when an Auspice tab is reopened or reloaded."
         },
         "auspiceVscode.largeTreeTipAdvisory": {
           "type": "integer",
@@ -328,6 +328,6 @@
     }
   },
   "patchedDependencies": {
-    "auspice@2.73.0": "patches/auspice@2.73.0.patch"
+    "auspice@3.0.0": "patches/auspice@3.0.0.patch"
   }
 }

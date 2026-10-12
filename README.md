@@ -79,9 +79,9 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
   //   integer >= 0 [default 5000]: tip-count threshold; 0 disables the advisory
   "auspiceVscode.largeTreeTipAdvisory": 5000,
 
-  // Show maps and let background tiles load from external providers. Dataset files always stay local.
+  // Show maps and let background tiles load from OpenFreeMap (tiles.openfreemap.org). Dataset files always stay local.
   //   false [default]: maps off; no external tile requests
-  //   true: maps on; background tiles load from external providers
+  //   true: maps on; background tiles load from OpenFreeMap
   "auspiceVscode.mapsEnabled": false,
 
   // Keep background tabs (open in the editor but not the one currently shown) fully alive, preserving each view's zoom, filters, and layout so switching back is instant. Takes effect after Reload Window.

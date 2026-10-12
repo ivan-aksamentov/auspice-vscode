@@ -50,8 +50,8 @@ const auspicePlugin: Bun.BunPlugin = {
     // The official v1 converter imports CLI logging utilities which depend on
     // Node APIs. Its conversion logic is browser-safe, so route that one import
     // to the webview logger while retaining the version-pinned converter itself.
-    build.onResolve({ filter: /^\.\.\/utils$/u }, (args) =>
-      args.importer.endsWith("/auspice/cli/server/convertJsonSchemas.js")
+    build.onResolve({ filter: /^\.\.\/utils\.js$/u }, (args) =>
+      args.importer.endsWith("/auspice/cli-build/server/convertJsonSchemas.js")
         ? { path: resolve(clientRoot, "auspice-cli-utils.ts") }
         : undefined,
     )
