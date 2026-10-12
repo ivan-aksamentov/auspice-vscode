@@ -91,7 +91,7 @@
 /*
  * The pull tab on the right edge of the sidebar, in the sidebar's colors. It starts 3 px inside the
  * sidebar, over its edge shadow, and continues that shadow around its outline; the clip path cuts
- * the shadow on its left side, so the tab and the sidebar join without a seam.
+ * the shadow on its left side, so no line shows between the tab and the sidebar.
  */
 .auspice-vscode-pull-tab {
   align-items: center;
