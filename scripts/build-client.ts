@@ -24,6 +24,14 @@ const auspicePlugin: Bun.BunPlugin = {
     build.onResolve({ filter: /^@extensions$/u }, () => ({
       path: resolve(clientRoot, "extensions-registry.tsx"),
     }))
+    // Auspice's own Babel build strips its `timerStart`/`timerEnd` calls
+    // (`strip-function-call` in its babel.config.cjs); kept, they log the
+    // duration of every tree and chart update to the console. Registered before
+    // the Babel loader below, which would otherwise load this module.
+    build.onLoad({ filter: /auspice\/src\/util\/perf\.js$/u }, () => ({
+      contents: "export const timerStart = () => {};\nexport const timerEnd = () => {};\n",
+      loader: "js",
+    }))
     // Auspice's source is written for its Babel build: legacy (`@connect`)
     // decorators and class properties. Bun's transpiler applies the newer TC39
     // decorator semantics, which throws at runtime, so transform Auspice's source
