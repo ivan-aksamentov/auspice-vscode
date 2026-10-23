@@ -143,7 +143,8 @@ declare module "@auspice/components/map/map" {
     readonly width: number
     readonly height: number
     readonly justGotNewDatasetRenderNewMap: boolean
-    readonly legend: boolean
+    /** Sections of the map legend: the color swatches and the deme sizes */
+    readonly legend: { readonly swatches: boolean; readonly demes: boolean }
   }>
   export default AuspiceMap
 }
@@ -211,7 +212,12 @@ declare module "@auspice/components/download/helperFunctions" {
     panelsInDOM: readonly string[],
     panelLayout: string,
     publications: readonly unknown[],
-  ): void
+    /**
+     * Text lines (HTML) below the figure, in place of the lines that Auspice writes for nextstrain
+     * datasets
+     */
+    caption?: readonly string[],
+  ): Promise<void>
   export function auspiceJSON(dispatch: Dispatch, state: unknown, filePrefix: string): void
   export function exportTree(options: {
     readonly dispatch: Dispatch

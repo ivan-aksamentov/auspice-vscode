@@ -33,7 +33,7 @@ export function TreeDownloadButtons({ buttonStyle }: TreeDownloadButtonsProps): 
       import("@auspice/components/download/downloadModal"),
     ])
     const { metadata, tree, controls } = viewStateSchema.parse(store.getState())
-    writeSvg(
+    await writeSvg(
       store.dispatch,
       t,
       metadata,

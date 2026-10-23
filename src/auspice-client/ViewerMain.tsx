@@ -126,6 +126,8 @@ function Panels(): React.ReactElement {
   // Tree names key the panels, so that they mount anew for a new dataset
   const key = `${treeName ?? ""}${typeof secondTreeName === "string" ? `:${secondTreeName}` : ""}`
   const mapInGrid = inGrid && numberOfGridPanels(panels) % 2 === 0
+  // A map in the grid leaves the color swatches to the tree legend, as in Auspice's `<Main>`
+  const mapLegend = useMemo(() => ({ swatches: !mapInGrid, demes: true }), [mapInGrid])
   const usableWidth = area.size === undefined ? 0 : calcUsableWidth(area.size.width, 1)
 
   return (
@@ -160,7 +162,7 @@ function Panels(): React.ReactElement {
                 {...(mapInGrid ? sizes.grid : sizes.full)}
                 key={`${key}_map`}
                 justGotNewDatasetRenderNewMap={false}
-                legend={!mapInGrid}
+                legend={mapLegend}
               />
             </LazyPanel>
           ) : null}
