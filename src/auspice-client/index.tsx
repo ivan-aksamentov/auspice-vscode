@@ -43,6 +43,7 @@ import ReactDOM from "react-dom"
 import { initReactI18next } from "react-i18next"
 
 import { App } from "./App"
+import { registerBasemapProtocol } from "./basemap"
 // Side-effect import: wires the host <-> webview message bridge and posts "ready".
 import "./bridge"
 
@@ -57,6 +58,8 @@ import "@auspice/css/notifications.css"
 import "@auspice/css/select.css"
 import "./fonts.css"
 import "./viewer.css"
+
+registerBasemapProtocol()
 
 // Auspice keeps animation scratch state on this global (normally seeded by its
 // own entry point, which the shell replaces).

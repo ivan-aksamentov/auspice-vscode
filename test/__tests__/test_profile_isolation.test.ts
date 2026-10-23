@@ -56,7 +56,6 @@ describe("VS Code test profile isolation", () => {
         "enable-crash-reporter": false,
       },
       settings: {
-        "auspiceVscode.mapsEnabled": false,
         "extensions.autoCheckUpdates": false,
         "extensions.autoUpdate": "off",
         "extensions.ignoreRecommendations": true,

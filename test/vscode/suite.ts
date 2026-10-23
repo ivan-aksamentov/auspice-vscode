@@ -1,16 +1,7 @@
 import { strict as assert } from "node:assert"
 import { resolve as resolvePath } from "node:path"
 
-import {
-  ConfigurationTarget,
-  commands,
-  extensions,
-  TabInputCustom,
-  TabInputText,
-  Uri,
-  window,
-  workspace,
-} from "vscode"
+import { commands, extensions, TabInputCustom, TabInputText, Uri, window } from "vscode"
 
 export async function run(): Promise<void> {
   const extension = extensions.getExtension("ivan-aksamentov.auspice-vscode")
@@ -32,10 +23,6 @@ export async function run(): Promise<void> {
   assert.ok(registered.includes("auspiceVscode.addMetadata"), "metadata command is registered")
   assert.ok(registered.includes("auspiceVscode.openNarrative"), "narrative command is registered")
   assert.ok(registered.includes("auspiceVscode.showInputs"), "input-list command is registered")
-
-  await workspace
-    .getConfiguration("auspiceVscode")
-    .update("mapsEnabled", false, ConfigurationTarget.Global)
 
   const root = process.env["AUSPICE_EXTENSION_ROOT"]
   assert.ok(root !== undefined && root !== "", "AUSPICE_EXTENSION_ROOT is defined")

@@ -6,7 +6,6 @@ import { loadIntoAuspice } from "./adapter"
 import { parseViewerResources } from "./input"
 import { vscode } from "./messages"
 import type { ViewerStatus } from "./messages"
-import { canDrawMaps } from "./panelSettings"
 import { store } from "./store"
 
 const resourceSchema = z.object({
@@ -21,7 +20,6 @@ const hostMessageSchema = z.discriminatedUnion("type", [
     resources: z.array(resourceSchema),
     resourceLimitBytes: z.number().int().positive(),
     largeTreeTipAdvisory: z.number().int().nonnegative(),
-    mapsEnabled: z.boolean(),
     sidebarInitialState: z.enum(["open", "closed", "dataset"]),
     initialPanels: z.enum(["tree", "dataset"]),
     locale: z.string().min(2),
@@ -94,8 +92,7 @@ function addMetadata(resources: readonly Resource[]): void {
       // Coordinates make the map available, which this window may be unable to draw
       if (
         geoResolutionCount() > geoResolutionsBefore &&
-        !store.getState().viewerSettings.mapsAvailable &&
-        !canDrawMaps()
+        !store.getState().viewerSettings.mapsAvailable
       ) {
         dispatchStatus({
           kind: "warning",
@@ -146,7 +143,6 @@ async function load(message: LoadMessage): Promise<void> {
     const diagnostics = loadIntoAuspice(
       inputs,
       message.largeTreeTipAdvisory,
-      message.mapsEnabled,
       message.sidebarInitialState,
       message.initialPanels,
       message.locale,
@@ -209,7 +205,6 @@ interface LoadMessage {
   }[]
   readonly resourceLimitBytes: number
   readonly largeTreeTipAdvisory: number
-  readonly mapsEnabled: boolean
   readonly sidebarInitialState: "open" | "closed" | "dataset"
   readonly initialPanels: "tree" | "dataset"
   readonly locale: string

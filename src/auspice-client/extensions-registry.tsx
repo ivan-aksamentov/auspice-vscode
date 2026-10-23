@@ -1,3 +1,5 @@
+import { BASEMAP_ATTRIBUTION, BASEMAP_STYLE } from "./basemap"
+
 // Auspice resolves customisations through `getExtension`/`hasExtension`
 // (`@auspice/util/extensions`). Its stock implementation reads a build-time
 // `EXTENSION_DATA` env var and loads components through webpack's
@@ -11,10 +13,14 @@
 // `filePrefix` gives them a fixed name ("view.svg") that the host prefixes with
 // the dataset name in the save dialog.
 //
+// The map draws the Natural Earth basemap that ships with the extension (see
+// `basemap.ts`) instead of Auspice's default tiles from a third-party server.
+//
 // Auspice's download modal describes nextstrain.org data (data use, license,
 // publications). `downloadModal: false` turns it off; the download buttons above
 // the tree replace it.
 const registry: Record<string, unknown> = {
+  mapTiles: { style: BASEMAP_STYLE, attribution: BASEMAP_ATTRIBUTION },
   sidebarTheme: {
     background: "#F2F2F2",
     color: "#000",

@@ -4,19 +4,20 @@ import { webviewMessageSchema } from "../../src/protocol"
 import { renderWebviewHtml } from "../../src/webviewHtml"
 
 describe("webview contract", () => {
-  test("test_webview_html_disables_network_access_without_map_permission", () => {
+  test("test_webview_html_fetches_only_the_resources_of_the_extension", () => {
     const actual = renderWebviewHtml({
       assets: testAssets,
+      basemapBase: "vscode-resource:/extension/basemap",
       cspSource: "vscode-webview:",
-      mapsEnabled: false,
       nonce: "test-nonce",
       viewerScale: 1,
     })
 
     // VS Code's webview security model requires explicit resource URIs and deny-by-default CSP.
     // Oracle: the SVG export fetches the Lato font from the `data:` URL that the bundle inlines
-    // (`latoFontDefs()` in Auspice's `components/download/embedFont.js`), and nothing else.
-    expect(actual).toContain("connect-src data:;")
+    // (`latoFontDefs()` in Auspice's `components/download/embedFont.js`), and the map its basemap
+    // files from the webview's own resources; nothing else.
+    expect(actual).toContain("connect-src data: vscode-webview:;")
     expect(actual).toContain('href="vscode-resource:/extension/favicon.png"')
     expect(actual).toContain(
       '<script type="module" nonce="test-nonce" src="vscode-resource:/extension/auspice-client.js"></script>',
@@ -26,8 +27,8 @@ describe("webview contract", () => {
   test("test_webview_html_loads_a_single_client_bundle", () => {
     const actual = renderWebviewHtml({
       assets: testAssets,
+      basemapBase: "vscode-resource:/extension/basemap",
       cspSource: "vscode-webview:",
-      mapsEnabled: false,
       nonce: "test-nonce",
       viewerScale: 1,
     })
@@ -39,25 +40,26 @@ describe("webview contract", () => {
     expect(actual).toContain('src="vscode-resource:/extension/logo.png"')
   })
 
-  test("test_webview_html_allows_only_configured_map_origins", () => {
+  test("test_webview_html_loads_the_basemap_from_the_extension", () => {
     const actual = renderWebviewHtml({
       assets: testAssets,
+      basemapBase: "vscode-resource:/extension/basemap",
       cspSource: "vscode-webview:",
-      mapsEnabled: true,
       nonce: "test-nonce",
       viewerScale: 1,
     })
 
-    // Auspice's default map style loads every tile, glyph and sprite from OpenFreeMap.
-    expect(actual).toContain("connect-src data: https://tiles.openfreemap.org;")
-    expect(actual).toContain("img-src vscode-webview: data: blob: https://tiles.openfreemap.org;")
+    // Oracle: the map fetches its basemap files from the webview's own resources, at the address
+    // that the page gives the client, and from no other origin
+    expect(actual).toContain('data-basemap-base="vscode-resource:/extension/basemap"')
+    expect(actual).toContain("img-src vscode-webview: data:;")
   })
 
   test("test_webview_html_fills_the_editor_without_the_default_body_padding", () => {
     const actual = renderWebviewHtml({
       assets: testAssets,
+      basemapBase: "vscode-resource:/extension/basemap",
       cspSource: "vscode-webview:",
-      mapsEnabled: false,
       nonce: "test-nonce",
       viewerScale: 1,
     })
@@ -70,8 +72,8 @@ describe("webview contract", () => {
   test("test_webview_html_injects_viewer_scale_to_counteract_editor_zoom", () => {
     const actual = renderWebviewHtml({
       assets: testAssets,
+      basemapBase: "vscode-resource:/extension/basemap",
       cspSource: "vscode-webview:",
-      mapsEnabled: false,
       nonce: "test-nonce",
       viewerScale: 0.75,
     })

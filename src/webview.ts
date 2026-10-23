@@ -1,11 +1,15 @@
 import type { ExtensionContext, Webview } from "vscode"
 import { Uri } from "vscode"
 
-import { CLIENT_BUNDLE_FILE, CLIENT_FAVICON_FILE, CLIENT_LOGO_FILE } from "./auspiceAssets.js"
+import {
+  CLIENT_BASEMAP_DIRECTORY,
+  CLIENT_BUNDLE_FILE,
+  CLIENT_FAVICON_FILE,
+  CLIENT_LOGO_FILE,
+} from "./auspiceAssets.js"
 import { renderWebviewHtml } from "./webviewHtml.js"
 
 export interface WebviewOptions {
-  readonly mapsEnabled: boolean
   readonly viewerScale: number
   readonly isCancelled: () => boolean
 }
@@ -28,8 +32,8 @@ export function configureWebview(
       logo: assetUri(webview, clientRoot, CLIENT_LOGO_FILE),
       bundle: assetUri(webview, clientRoot, CLIENT_BUNDLE_FILE),
     },
+    basemapBase: assetUri(webview, clientRoot, CLIENT_BASEMAP_DIRECTORY),
     cspSource: webview.cspSource,
-    mapsEnabled: options.mapsEnabled,
     nonce,
     viewerScale: options.viewerScale,
   })

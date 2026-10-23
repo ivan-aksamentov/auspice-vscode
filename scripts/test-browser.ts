@@ -5,7 +5,7 @@ import { resolve } from "node:path"
 import { chromium } from "@playwright/test"
 import type { Page } from "@playwright/test"
 
-import { CLIENT_BUNDLE_FILE } from "../src/auspiceAssets"
+import { CLIENT_BASEMAP_DIRECTORY, CLIENT_BUNDLE_FILE } from "../src/auspiceAssets"
 import { webviewCsp } from "../src/webviewHtml"
 
 const contractDataset = {
@@ -101,6 +101,13 @@ const branchLabelDataset = {
     ],
   },
 }
+// The basemap files that a map loads
+const BASEMAP_FILES = [
+  "/basemap/countries.json",
+  "/basemap/borders.json",
+  "/basemap/labels.json",
+  "/basemap/fonts/Noto%20Sans%20Bold/0-255.pbf",
+]
 // Coordinates of the tips of the entropy dataset, which has no map
 const COORDINATES_CSV = `strain,latitude,longitude
 A,46.8,8.2
@@ -179,7 +186,9 @@ const timeTreeDataset = {
   },
 }
 const extensionRoot = resolve(import.meta.dirname, "..")
-const bundle = Bun.file(resolve(extensionRoot, "dist", "auspice-client", CLIENT_BUNDLE_FILE))
+const clientRoot = resolve(extensionRoot, "dist", "auspice-client")
+const bundle = Bun.file(resolve(clientRoot, CLIENT_BUNDLE_FILE))
+const basemapRoot = resolve(clientRoot, CLIENT_BASEMAP_DIRECTORY)
 const browserPath =
   process.env["BROWSER"] ??
   ["chromium-browser", "chromium", "google-chrome"]
@@ -198,8 +207,8 @@ function commandPath(command: string): string | undefined {
 const server = Bun.serve({
   port: 0,
   routes: {
-    "/": () => browserPage({ mapsEnabled: false }),
-    "/maps": () => browserPage({ mapsEnabled: true }),
+    "/": () => browserPage(),
+    [`/${CLIENT_BASEMAP_DIRECTORY}/*`]: (request) => basemapFile(new URL(request.url)),
     [`/${CLIENT_BUNDLE_FILE}`]: new Response(bundle, {
       headers: { "Content-Type": "text/javascript" },
     }),
@@ -208,10 +217,11 @@ const server = Bun.serve({
 const browser = await chromium.launch({ executablePath: browserPath, headless: true })
 const scenarios: readonly Scenario[] = [
   {
-    name: "renders the controls and leaves out the map while maps are off",
+    name: "renders the controls and leaves out the map without WebGL",
     async run() {
       const { page, pageErrors, consoleTimers } = await openViewer(contractDataset, {
         panels: "dataset",
+        webgl: false,
       })
       await page.getByText("Color By", { exact: true }).waitFor()
       await page.locator('button[data-for="EditButton"]').waitFor()
@@ -669,7 +679,6 @@ const scenarios: readonly Scenario[] = [
       const { page, pageErrors } = await openViewer(contractDataset, {
         viewport: { width: 1_700, height: 900 },
         panels: "dataset",
-        maps: true,
       })
       await page.locator(".leaflet-container canvas").first().waitFor()
       await page.getByRole("button", { name: "grid" }).waitFor()
@@ -722,14 +731,25 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
-    name: "draws the map when maps are on",
+    name: "draws the Natural Earth basemap from the files of the extension",
     async run() {
-      const { page, pageErrors } = await openViewer(contractDataset, {
-        maps: true,
+      const { page, pageErrors, foreignRequests } = await openViewer(contractDataset, {
         panels: "dataset",
       })
-      // Tile requests leave the test page and are aborted; the map itself still renders
       await page.locator(".leaflet-container canvas").first().waitFor()
+      // Oracle: the map style names the outlines, borders and labels, and the glyphs of the label
+      // font for the characters of the country names (`basemap.ts`)
+      await page.waitForFunction((files) => {
+        const requested = performance.getEntriesByType("resource").map(({ name }) => name)
+        return files.every((file) => requested.some((url) => url.endsWith(file)))
+      }, BASEMAP_FILES)
+      const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+      assert.ok(svgExport?.content.includes('<svg id="map"') === true, "the SVG export has no map")
+      assert.ok(
+        /Map: .*Natural Earth.*5\.1\.2/su.test(svgExport?.content ?? ""),
+        "the caption does not name the map data",
+      )
+      assert.deepEqual(foreignRequests, [])
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -738,7 +758,6 @@ const scenarios: readonly Scenario[] = [
     async run() {
       const { page, pageErrors } = await openViewer(entropyDataset, {
         panels: "dataset",
-        maps: true,
       })
       await page.locator("#d3entropyParent").waitFor()
       const entropyPanel = page.getByRole("checkbox", { name: "Show Entropy panel" })
@@ -757,7 +776,6 @@ const scenarios: readonly Scenario[] = [
     name: "says why added coordinates show no map when the window has no WebGL",
     async run() {
       const { page, pageErrors } = await openViewer(entropyDataset, {
-        maps: true,
         webgl: false,
       })
       await page.locator("#MainTree .tip").first().waitFor()
@@ -772,7 +790,6 @@ const scenarios: readonly Scenario[] = [
     name: "hides the map and reports why when the window has no WebGL",
     async run() {
       const { page, pageErrors } = await openViewer(contractDataset, {
-        maps: true,
         webgl: false,
         panels: "dataset",
       })
@@ -820,9 +837,9 @@ try {
  * Return the test page of the client: the webview shell with the production Content Security
  * Policy, and a stub of the VS Code API that records the messages that the client posts
  */
-function browserPage({ mapsEnabled }: { readonly mapsEnabled: boolean }): Response {
+function browserPage(): Response {
   const nonce = crypto.randomUUID().replaceAll("-", "")
-  const csp = webviewCsp({ cspSource: server.url.origin, mapsEnabled, nonce })
+  const csp = webviewCsp({ cspSource: server.url.origin, nonce })
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -831,7 +848,7 @@ function browserPage({ mapsEnabled }: { readonly mapsEnabled: boolean }): Respon
     <style>html,body,#root{width:100%;height:100%;margin:0}</style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" data-basemap-base="${server.url.origin}/${CLIENT_BASEMAP_DIRECTORY}"></div>
     <script nonce="${nonce}">
       window.viewerMessages = [];
       window.acquireVsCodeApi = () => ({ postMessage: (message) => window.viewerMessages.push(message) });
@@ -842,6 +859,16 @@ function browserPage({ mapsEnabled }: { readonly mapsEnabled: boolean }): Respon
   return new Response(html, { headers: { "Content-Type": "text/html" } })
 }
 
+/** Serve a basemap file of the client, as the webview serves the extension's resources */
+function basemapFile(url: URL): Response {
+  const path = resolve(
+    basemapRoot,
+    decodeURIComponent(url.pathname.slice(`/${CLIENT_BASEMAP_DIRECTORY}/`.length)),
+  )
+  if (!path.startsWith(`${basemapRoot}/`)) return new Response(null, { status: 404 })
+  return new Response(Bun.file(path))
+}
+
 async function openViewer(
   dataset: unknown,
   {
@@ -849,7 +876,6 @@ async function openViewer(
     secondDataset,
     files = [],
     sidebar = "open",
-    maps = false,
     webgl = true,
     panels = "tree",
   }: ViewerOptions = {},
@@ -876,11 +902,18 @@ async function openViewer(
       pageErrors.push(message.text())
     }
   })
+  // The viewer may request nothing from another origin; such requests are recorded and aborted
+  const foreignRequests: string[] = []
   await page.route("**/*", async (route) => {
     const requestUrl = new URL(route.request().url())
-    await (requestUrl.origin === server.url.origin ? route.continue() : route.abort())
+    if (requestUrl.origin === server.url.origin || requestUrl.protocol === "data:") {
+      await route.continue()
+      return
+    }
+    foreignRequests.push(requestUrl.toString())
+    await route.abort()
   })
-  await page.goto(new URL(maps ? "/maps" : "/", server.url).toString())
+  await page.goto(server.url.toString())
   await page.waitForFunction(
     () =>
       window.viewerMessages?.some(
@@ -897,8 +930,8 @@ async function openViewer(
       : [{ name: "second.auspice.json", text: JSON.stringify(secondDataset) }]),
     ...files,
   ]
-  await loadFiles(page, resources, { sidebar, maps, panels })
-  return { page, pageErrors, consoleTimers }
+  await loadFiles(page, resources, { sidebar, panels })
+  return { page, pageErrors, consoleTimers, foreignRequests }
 }
 
 interface Scenario {
@@ -913,8 +946,6 @@ interface ViewerOptions {
   /** Further input files, e.g. a narrative and its datasets */
   readonly files?: readonly ViewerFile[]
   readonly sidebar?: "open" | "closed"
-  /** The `mapsEnabled` setting */
-  readonly maps?: boolean
   /** Whether the browser provides WebGL */
   readonly webgl?: boolean
   /** The `initialPanels` setting */
@@ -947,6 +978,8 @@ interface OpenViewer {
   readonly page: Page
   readonly pageErrors: string[]
   readonly consoleTimers: string[]
+  /** Requests to other origins than the test server, which the page may not make */
+  readonly foreignRequests: string[]
 }
 
 /** Return the width of the main tree SVG */
@@ -1235,16 +1268,14 @@ async function loadFiles(
   files: readonly ViewerFile[],
   {
     sidebar,
-    maps,
     panels,
   }: {
     readonly sidebar: "open" | "closed"
-    readonly maps: boolean
     readonly panels: "tree" | "dataset"
   },
 ): Promise<void> {
   await page.evaluate(
-    ({ inputFiles, sidebarInitialState, mapsEnabled, initialPanels }) => {
+    ({ inputFiles, sidebarInitialState, initialPanels }) => {
       const resources = inputFiles.map(({ name, text }) => ({
         uri: `file:///${name}`,
         name,
@@ -1257,7 +1288,6 @@ async function loadFiles(
           resources,
           resourceLimitBytes: 1_000_000,
           largeTreeTipAdvisory: 0,
-          mapsEnabled,
           sidebarInitialState,
           initialPanels,
           locale: "en",
@@ -1265,7 +1295,7 @@ async function loadFiles(
         "*",
       )
     },
-    { inputFiles: files, sidebarInitialState: sidebar, mapsEnabled: maps, initialPanels: panels },
+    { inputFiles: files, sidebarInitialState: sidebar, initialPanels: panels },
   )
   await page.waitForFunction(
     () =>

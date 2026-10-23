@@ -205,7 +205,6 @@ export function createViewerManager(
     )
     function reloadWebview(): void {
       configureWebview(context, panel.webview, {
-        mapsEnabled: mapsEnabled(uri),
         viewerScale: viewerScale(uri),
         isCancelled: () => token?.isCancellationRequested === true || session.isDisposed(),
       })
@@ -344,7 +343,6 @@ function createViewerSession(
         resources,
         resourceLimitBytes: limitBytes,
         largeTreeTipAdvisory: largeTreeTipAdvisory(uri),
-        mapsEnabled: mapsEnabled(uri),
         sidebarInitialState: sidebarInitialState(uri),
         initialPanels: initialPanels(uri),
         locale: auspiceLocale(),
@@ -602,11 +600,6 @@ async function saveExport(datasetUri: Uri, filename: string, content: ArrayBuffe
   if (destination !== undefined) {
     await workspace.fs.writeFile(destination, new Uint8Array(content))
   }
-}
-
-function mapsEnabled(uri: Uri): boolean {
-  const configured = workspace.getConfiguration("auspiceVscode", uri).get<unknown>("mapsEnabled")
-  return configured === true
 }
 
 function sidebarInitialState(uri: Uri): "open" | "closed" | "dataset" {

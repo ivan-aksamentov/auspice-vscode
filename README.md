@@ -41,7 +41,8 @@ Alternatively, open the Extensions view, select **Views and More Actions...**, c
 - **Metadata**: apply CSV, TSV, XLSX, or node-data JSON to the active view.
 - **Comparison and narratives**: open a second tree in a tangle view, or render a local Markdown narrative with its referenced datasets.
 - **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels. The tab on its edge folds it away and back; the tree always fills the space beside it.
-- **Tree first**: a viewer starts with only the tree. The sidebar has a toggle for each other panel of the dataset: Map, Entropy, Frequency, and Measurements.
+- **Tree first**: a viewer starts with only the tree. The sidebar has a toggle for each other panel of the dataset: Map, Entropy, Frequency, and Measurements. Added metadata keeps the panels that you turned off, and turns on the map when it brings coordinates.
+- **Maps**: the map draws Natural Earth 5.1.2 country outlines, borders, and names that ship with the extension, so it makes no network request. Maps need WebGL; a window without it (e.g. with hardware acceleration disabled) hides the map and reports why.
 - **Downloads**: the buttons in the title row of the tree save the current view as a figure (SVG), an Auspice dataset (JSON), a Newick tree (NWK), the metadata of the shown tips (TSV), or the genetic diversity data (Entropy TSV). The figure has a caption with the dataset title, the shown tips and the Auspice citation. The save dialog proposes a file next to the dataset, named after it.
 
 Each primary dataset opens in its own tab with an independent store and file lifecycle.
@@ -84,12 +85,6 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
   // Show a performance advisory when a tree exceeds this many tips.
   //   integer >= 0 [default 5000]: tip-count threshold; 0 disables the advisory
   "auspiceVscode.largeTreeTipAdvisory": 5000,
-
-  // Show maps and let background tiles load from OpenFreeMap (tiles.openfreemap.org). Dataset files always stay local.
-  // Maps need WebGL; a window without it (e.g. with hardware acceleration disabled) hides the map and reports why.
-  //   false [default]: maps off; no external tile requests
-  //   true: maps on; background tiles load from OpenFreeMap
-  "auspiceVscode.mapsEnabled": false,
 
   // Keep background tabs (open in the editor but not the one currently shown) fully alive, preserving each view's zoom, filters, and layout so switching back is instant. Takes effect after Reload Window.
   //   true [default]: keep background tabs alive
@@ -183,4 +178,4 @@ The command creates the stable symlink `~/.vscode/extensions/ivan-aksamentov.aus
 
 ## License
 
-Extension code is licensed under the MIT License (`LICENSE`). The bundled Auspice client remains under AGPL-3.0-only (`assets/licenses/AUSPICE-LICENSE.txt`), and bundled phylotree code under its own terms (`assets/licenses/PHYLLOTREE-LICENSE.txt`).
+Extension code is licensed under the MIT License (`LICENSE`). The bundled Auspice client remains under AGPL-3.0-only (`assets/licenses/AUSPICE-LICENSE.txt`), and bundled phylotree code under its own terms (`assets/licenses/PHYLLOTREE-LICENSE.txt`). The map data comes from [Natural Earth](https://www.naturalearthdata.com/) (public domain), and its labels use glyphs of the Noto Sans font under the SIL Open Font License (`assets/licenses/NOTO-SANS-LICENSE.txt`).

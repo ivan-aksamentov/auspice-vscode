@@ -41,7 +41,6 @@ export interface LoadMessage {
   readonly resources: readonly ViewerResource[]
   readonly resourceLimitBytes: number
   readonly largeTreeTipAdvisory: number
-  readonly mapsEnabled: boolean
   readonly sidebarInitialState: "open" | "closed" | "dataset"
   readonly initialPanels: "tree" | "dataset"
   readonly locale: string

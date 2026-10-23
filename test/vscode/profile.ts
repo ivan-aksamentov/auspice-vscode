@@ -7,7 +7,6 @@ const TEST_MACHINE_ARGUMENTS = {
   "enable-crash-reporter": false,
 }
 const TEST_SETTINGS = {
-  "auspiceVscode.mapsEnabled": false,
   "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": "off",
   "extensions.ignoreRecommendations": true,

@@ -1,9 +1,14 @@
-import { access, readFile } from "node:fs/promises"
+import { access, cp, readFile } from "node:fs/promises"
 import { dirname, extname, resolve } from "node:path"
 
 import { transformAsync } from "@babel/core"
 
-import { CLIENT_BUNDLE_FILE, CLIENT_FAVICON_FILE, CLIENT_LOGO_FILE } from "../src/auspiceAssets.js"
+import {
+  CLIENT_BASEMAP_DIRECTORY,
+  CLIENT_BUNDLE_FILE,
+  CLIENT_FAVICON_FILE,
+  CLIENT_LOGO_FILE,
+} from "../src/auspiceAssets.js"
 
 const extensionRoot = resolve(import.meta.dirname, "..")
 const clientRoot = resolve(extensionRoot, "src", "auspice-client")
@@ -123,9 +128,15 @@ export async function buildClient(): Promise<void> {
     resolve(outputRoot, CLIENT_LOGO_FILE),
     Bun.file(resolve(extensionRoot, "assets", "img", "logo-256.png")),
   )
+  // The map loads the basemap files only when it is shown (see `basemap.ts` in the client)
+  await cp(
+    resolve(extensionRoot, "assets", "basemap"),
+    resolve(outputRoot, CLIENT_BASEMAP_DIRECTORY),
+    { recursive: true },
+  )
   await Promise.all(
-    [CLIENT_BUNDLE_FILE, CLIENT_FAVICON_FILE, CLIENT_LOGO_FILE].map((file) =>
-      access(resolve(outputRoot, file)),
+    [CLIENT_BUNDLE_FILE, CLIENT_FAVICON_FILE, CLIENT_LOGO_FILE, CLIENT_BASEMAP_DIRECTORY].map(
+      (file) => access(resolve(outputRoot, file)),
     ),
   )
 }

@@ -1,8 +1,12 @@
+/**
+ * Leave the map out of the dataset's panels when this window cannot draw it (see `canDrawMaps`), so
+ * that Auspice starts without a map panel that would fail
+ */
 export function applyMapSetting(
   json: Record<string, unknown>,
-  mapsEnabled: boolean,
+  mapsAvailable: boolean,
 ): Record<string, unknown> {
-  if (mapsEnabled || !isRecord(json["meta"])) return json
+  if (mapsAvailable || !isRecord(json["meta"])) return json
   const meta = json["meta"]
   const panels = Array.isArray(meta["panels"])
     ? { panels: meta["panels"].filter((panel) => panel !== "map") }

@@ -10,7 +10,6 @@ import { setViewerSettings, store } from "./store"
 export function loadIntoAuspice(
   inputs: ParsedInputs,
   largeTreeTipAdvisory: number,
-  mapsEnabled: boolean,
   sidebarInitialState: "open" | "closed" | "dataset",
   initialPanels: InitialPanels,
   locale: string,
@@ -30,15 +29,15 @@ export function loadIntoAuspice(
       },
     ]
   }
-  const showMaps = mapsEnabled && canDrawMaps()
-  // Before the dataset, so that the panels of the new state follow the setting (see `choosePanels`)
+  const showMaps = canDrawMaps()
+  // Before the dataset, so that its panels leave out a map that cannot be drawn (see `choosePanels`)
   dispatch(setViewerSettings({ mapsAvailable: showMaps }))
-  if (mapsEnabled && !showMaps) {
+  if (!showMaps && hasGeoResolutions(main.json)) {
     diagnostics.push({
       resourceIndex: main.resourceIndex,
       severity: "warning",
       message:
-        "Maps are enabled, but this VS Code window cannot draw them: the map needs WebGL, which is unavailable, e.g. with hardware acceleration disabled. The map panel is hidden.",
+        "This dataset has a map, but this VS Code window cannot draw it: the map needs WebGL, which is unavailable, e.g. with hardware acceleration disabled. The map panel is hidden.",
     })
   }
   // A narrative shows the panels its author chose for each slide
@@ -143,6 +142,13 @@ function findSidecar(
 
 function datasetName(name: string): string {
   return name.replaceAll("_", "/")
+}
+
+function hasGeoResolutions(json: Record<string, unknown>): boolean {
+  const meta = json["meta"]
+  return (
+    isRecord(meta) && Array.isArray(meta["geo_resolutions"]) && meta["geo_resolutions"].length > 0
+  )
 }
 
 function countTips(tree: unknown): number {

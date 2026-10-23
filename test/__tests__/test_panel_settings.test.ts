@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { applyInitialPanels, applyMapSetting } from "../../src/auspice-client/panelSettings"
 
 describe("map setting", () => {
-  test("test_panel_settings_map_removes_map_panels_when_disabled", () => {
+  test("test_panel_settings_map_removes_map_panels_without_webgl", () => {
     const input = {
       meta: {
         panels: ["tree", "map", "entropy"],
@@ -12,7 +12,7 @@ describe("map setting", () => {
       tree: { name: "root" },
     }
 
-    // Oracle: mapsEnabled=false means the Auspice map panel must not be available.
+    // Oracle: a window without WebGL cannot draw Auspice's map, so its panel must not be available
     expect(applyMapSetting(input, false)).toEqual({
       meta: {
         panels: ["tree", "entropy"],
@@ -23,7 +23,7 @@ describe("map setting", () => {
     expect(input.meta.panels).toEqual(["tree", "map", "entropy"])
   })
 
-  test("test_panel_settings_map_preserves_dataset_when_enabled", () => {
+  test("test_panel_settings_map_preserves_dataset_with_webgl", () => {
     const input = { meta: { panels: ["tree", "map"] }, tree: { name: "root" } }
 
     expect(applyMapSetting(input, true)).toBe(input)

@@ -1,6 +1,3 @@
-// Tile server of the map style that Auspice ships (`src/util/map-styles.json`)
-const MAP_TILE_ORIGIN = "https://tiles.openfreemap.org"
-
 export function renderWebviewHtml(options: WebviewHtmlOptions): string {
   const csp = webviewCsp(options)
   return `<!doctype html>
@@ -66,41 +63,40 @@ export function renderWebviewHtml(options: WebviewHtmlOptions): string {
     </style>
   </head>
   <body>
-    <div id="root" style="--auspice-viewer-scale: ${options.viewerScale}"><output class="auspice-loading"><img class="auspice-loading__logo" src="${options.assets.logo}" alt="Loading" width="96" height="96"></output></div>
+    <div id="root" style="--auspice-viewer-scale: ${options.viewerScale}" data-basemap-base="${options.basemapBase}"><output class="auspice-loading"><img class="auspice-loading__logo" src="${options.assets.logo}" alt="Loading" width="96" height="96"></output></div>
     <script type="module" nonce="${options.nonce}" src="${options.assets.bundle}"></script>
   </body>
 </html>`
 }
 
 /**
- * Return the Content Security Policy of the viewer webview. The SVG export embeds the Lato font by
- * fetching it from the `data:` URL that the client bundle inlines.
+ * Return the Content Security Policy of the viewer webview. The page fetches only what the
+ * extension ships: the SVG export embeds the Lato font from the `data:` URL that the client bundle
+ * inlines, and the map loads its basemap files from the webview's own resources. MapLibre runs its
+ * workers from `blob:` URLs.
  */
 export function webviewCsp(options: WebviewCspOptions): string {
-  // Auspice draws the map with MapLibre from OpenFreeMap vector tiles. MapLibre fetches the
-  // tiles, glyphs and sprites, and may decode raster tiles through `blob:` image URLs.
-  const mapSources = options.mapsEnabled ? ` ${MAP_TILE_ORIGIN}` : ""
-  const mapImageSources = options.mapsEnabled ? ` blob:${mapSources}` : ""
   return [
     "default-src 'none'",
-    `img-src ${options.cspSource} data:${mapImageSources}`,
+    `img-src ${options.cspSource} data:`,
     `font-src ${options.cspSource} data:`,
     `style-src ${options.cspSource} 'unsafe-inline'`,
     `script-src 'nonce-${options.nonce}' 'strict-dynamic'`,
-    `connect-src data:${mapSources}`,
+    `connect-src data: ${options.cspSource}`,
     "worker-src blob:",
   ].join("; ")
 }
 
 export interface WebviewHtmlOptions extends WebviewCspOptions {
   readonly assets: WebviewAssetUris
+  /** Address of the directory of the basemap files of the map */
+  readonly basemapBase: string
   readonly viewerScale: number
 }
 
 export interface WebviewCspOptions {
   /** Origin of the webview's own resources (`Webview.cspSource`) */
   readonly cspSource: string
-  readonly mapsEnabled: boolean
   /** Nonce of the scripts that the page may run */
   readonly nonce: string
 }
