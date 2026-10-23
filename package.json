@@ -49,6 +49,7 @@
     "release": "bun run scripts/release.ts"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "1.9.7",
     "auspice": "3.1.0",
     "i18next": "19.9.2",
     "lodash": "4.18.1",

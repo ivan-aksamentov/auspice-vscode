@@ -101,6 +101,12 @@ const branchLabelDataset = {
     ],
   },
 }
+// Coordinates of the tips of the entropy dataset, which has no map
+const COORDINATES_CSV = `strain,latitude,longitude
+A,46.8,8.2
+B,46.8,8.2
+C,52.5,13.4
+`
 // A tree with short tip names, for a tanglegram with the tip label dataset
 const shortNameDataset = {
   version: "v2",
@@ -728,6 +734,41 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "turns on the map of added coordinates and keeps a panel that the user turned off",
+    async run() {
+      const { page, pageErrors } = await openViewer(entropyDataset, {
+        panels: "dataset",
+        maps: true,
+      })
+      await page.locator("#d3entropyParent").waitFor()
+      const entropyPanel = page.getByRole("checkbox", { name: "Show Entropy panel" })
+      await entropyPanel.focus()
+      await page.keyboard.press("Space")
+      await page.locator("#d3entropyParent").waitFor({ state: "detached" })
+
+      await addMetadata(page, [{ name: "places.csv", text: COORDINATES_CSV }])
+      await page.locator(".leaflet-container canvas").first().waitFor()
+      assert.equal(await entropyPanel.isChecked(), false)
+      assert.equal(await page.locator("#d3entropyParent").count(), 0)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "says why added coordinates show no map when the window has no WebGL",
+    async run() {
+      const { page, pageErrors } = await openViewer(entropyDataset, {
+        maps: true,
+        webgl: false,
+      })
+      await page.locator("#MainTree .tip").first().waitFor()
+      await addMetadata(page, [{ name: "places.csv", text: COORDINATES_CSV }])
+      await page.locator(".auspice-vscode-status").getByText(/WebGL/u).waitFor()
+      assert.equal(await page.locator(".leaflet-container").count(), 0)
+      assert.equal(await page.getByRole("checkbox", { name: "Show Map panel" }).count(), 0)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
     name: "hides the map and reports why when the window has no WebGL",
     async run() {
       const { page, pageErrors } = await openViewer(contractDataset, {
@@ -1128,6 +1169,18 @@ function overlappingNeighbors(boxes: readonly (Box | undefined)[]): string[] {
       ? []
       : [`${JSON.stringify(previous)} overlaps ${JSON.stringify(next)}`]
   })
+}
+
+/** Add metadata files to the view, as the "Add Metadata to Current View" command does */
+async function addMetadata(page: Page, files: readonly ViewerFile[]): Promise<void> {
+  await page.evaluate((inputFiles) => {
+    const resources = inputFiles.map(({ name, text }) => ({
+      uri: `file:///${name}`,
+      name,
+      bytes: new TextEncoder().encode(text).buffer,
+    }))
+    window.postMessage({ type: "addMetadata", resources }, "*")
+  }, files)
 }
 
 /** Wait until the page has rendered two more frames, so that the updates of an input show */

@@ -1,11 +1,11 @@
 import { Dataset } from "@auspice/actions/loadData"
 import type { DatasetInstance } from "@auspice/actions/loadData"
 import { createStateFromQueryOrJSONs } from "@auspice/actions/recomputeReduxState"
-import store from "@auspice/store"
 
 import type { MainInput, ParsedInputs, ViewerDiagnostic } from "./input"
 import { applyInitialPanels, applyMapSetting, canDrawMaps } from "./panelSettings"
 import type { InitialPanels } from "./panelSettings"
+import { setViewerSettings, store } from "./store"
 
 export function loadIntoAuspice(
   inputs: ParsedInputs,
@@ -31,6 +31,8 @@ export function loadIntoAuspice(
     ]
   }
   const showMaps = mapsEnabled && canDrawMaps()
+  // Before the dataset, so that the panels of the new state follow the setting (see `choosePanels`)
+  dispatch(setViewerSettings({ mapsAvailable: showMaps }))
   if (mapsEnabled && !showMaps) {
     diagnostics.push({
       resourceIndex: main.resourceIndex,

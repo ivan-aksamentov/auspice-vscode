@@ -1,5 +1,4 @@
 import { handleFilesDropped } from "@auspice/actions/filesDropped/filesDropped"
-import store from "@auspice/store"
 import i18n from "i18next"
 import { z } from "zod"
 
@@ -7,6 +6,8 @@ import { loadIntoAuspice } from "./adapter"
 import { parseViewerResources } from "./input"
 import { vscode } from "./messages"
 import type { ViewerStatus } from "./messages"
+import { canDrawMaps } from "./panelSettings"
+import { store } from "./store"
 
 const resourceSchema = z.object({
   uri: z.string(),
@@ -31,6 +32,9 @@ const hostMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("setScale"), scale: z.number().positive() }),
   z.object({ type: z.literal("addMetadata"), resources: z.array(resourceSchema) }),
 ])
+const geoResolutionsSchema = z.object({
+  metadata: z.looseObject({ geoResolutions: z.array(z.unknown()).optional() }),
+})
 const exportSchema = z.object({
   filename: z.string().min(1),
   mediaType: z.string().min(1),
@@ -84,11 +88,29 @@ function addMetadata(resources: readonly Resource[]): void {
       new File([resource.bytes], resource.name, { type: metadataMediaType(resource.name) }),
     )
   })
-  void Promise.resolve(store.dispatch(handleFilesDropped(transfer.files))).catch(
-    (error: unknown) => {
+  const geoResolutionsBefore = geoResolutionCount()
+  Promise.resolve(store.dispatch(handleFilesDropped(transfer.files)))
+    .then(() => {
+      // Coordinates make the map available, which this window may be unable to draw
+      if (
+        geoResolutionCount() > geoResolutionsBefore &&
+        !store.getState().viewerSettings.mapsAvailable &&
+        !canDrawMaps()
+      ) {
+        dispatchStatus({
+          kind: "warning",
+          message:
+            "The added metadata has coordinates, but this VS Code window cannot draw the map: the map needs WebGL, which is unavailable, e.g. with hardware acceleration disabled.",
+        })
+      }
+    })
+    .catch((error: unknown) => {
       dispatchStatus(reportErrors([error instanceof Error ? error.message : String(error)]))
-    },
-  )
+    })
+}
+
+function geoResolutionCount(): number {
+  return geoResolutionsSchema.parse(store.getState()).metadata.geoResolutions?.length ?? 0
 }
 
 function metadataMediaType(name: string): string {

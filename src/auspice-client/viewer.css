@@ -243,7 +243,8 @@
   opacity: 1;
 }
 
-.auspice-vscode-status-stale {
+.auspice-vscode-status-stale,
+.auspice-vscode-status-warning {
   color: var(--vscode-editorWarning-foreground, #cca700);
   opacity: 1;
 }

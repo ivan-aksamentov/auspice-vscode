@@ -1,13 +1,42 @@
-declare module "@auspice/store" {
-  import type { AnyAction, Store } from "redux"
-  import type { ThunkDispatch } from "redux-thunk"
+declare module "@auspice/reducers" {
+  import type { Reducer } from "redux"
 
-  // Auspice configures its store with redux-thunk, so `dispatch` accepts both
-  // plain actions and thunks. Typing it as the real redux store keeps
-  // react-redux's `Provider` happy while still accepting the thunk dispatches
-  // the adapter performs.
-  const store: Store & { dispatch: ThunkDispatch<unknown, unknown, AnyAction> }
-  export default store
+  /** Auspice's root state, with the parts that the viewer changes */
+  export interface AuspiceState {
+    readonly controls: AuspiceControls
+    readonly [part: string]: unknown
+  }
+
+  /** Auspice's controls state, with the panel lists */
+  interface AuspiceControls {
+    readonly panelsAvailable: readonly string[]
+    readonly panelsToDisplay: readonly string[]
+    readonly [control: string]: unknown
+  }
+
+  const rootReducer: Reducer<AuspiceState>
+  export default rootReducer
+}
+
+declare module "@auspice/middleware/changeURL" {
+  import type { Middleware } from "redux"
+
+  /** Write the view into the page address, and read the dataset names from it */
+  export const changeURLMiddleware: Middleware
+}
+
+declare module "@auspice/middleware/performanceFlags" {
+  import type { Middleware } from "redux"
+
+  /** Turn off costly drawing details for large trees */
+  export const performanceFlags: Middleware
+}
+
+declare module "@auspice/middleware/scatterplot" {
+  import type { Middleware } from "redux"
+
+  /** Keep the scatterplot axes in step with the color-by and the layout */
+  export const keepScatterplotStateInSync: Middleware
 }
 
 declare module "@auspice/components/controls/controls" {
@@ -266,7 +295,10 @@ declare module "@auspice/components/info/datasetSummary" {
 }
 
 declare module "@auspice/actions/panelDisplay" {
+  /** Return the number of grid panels (tree, measurements, map) among the panels */
   export function numberOfGridPanels(panels: readonly string[]): number
+  /** Return whether the panels hold two or more grid panels, between which Full and Grid choose */
+  export function hasMultipleGridPanels(panels: readonly string[]): boolean
 }
 
 declare module "@auspice/components/download/helperFunctions" {
@@ -325,8 +357,10 @@ declare module "@auspice/components/download/downloadModal" {
 
 declare module "@auspice/actions/types" {
   export const BROWSER_DIMENSIONS: string
+  export const REMOVE_TREE_TOO: string
   export const TOGGLE_MOBILE_DISPLAY: string
   export const TOGGLE_SIDEBAR: string
+  export const UPDATE_METADATA: string
 }
 
 declare module "@auspice/locales/en/language.json" {

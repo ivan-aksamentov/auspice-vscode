@@ -8,8 +8,18 @@
 // before the registry finishes initialising.
 export const vscode: ViewerHost = createViewerHost()
 
+/** Kinds of viewer status, which the toolbar styles */
+export const VIEWER_STATUS_KINDS = [
+  "idle",
+  "loading",
+  "ready",
+  "stale",
+  "warning",
+  "error",
+] as const
+
 export interface ViewerStatus {
-  readonly kind: "idle" | "loading" | "ready" | "stale" | "error"
+  readonly kind: (typeof VIEWER_STATUS_KINDS)[number]
   // Short summary shown in the toolbar.
   readonly message: string
   // Full list of error reasons, rendered as cards on the error splash. Empty

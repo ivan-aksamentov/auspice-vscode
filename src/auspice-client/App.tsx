@@ -1,11 +1,11 @@
 import { BROWSER_DIMENSIONS, TOGGLE_MOBILE_DISPLAY } from "@auspice/actions/types"
-import store from "@auspice/store"
 import React, { Suspense, useEffect, useRef } from "react"
 import { Provider, useSelector } from "react-redux"
 
 import { ViewerSplash } from "./components"
 import { createPanelDimensionDispatcher } from "./dimensions"
 import { ErrorBoundary } from "./ErrorBoundary"
+import { store } from "./store"
 import { Toolbar } from "./Toolbar"
 import { ViewerMain } from "./ViewerMain"
 

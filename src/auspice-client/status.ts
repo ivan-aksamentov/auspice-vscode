@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import { VIEWER_STATUS_KINDS } from "./messages"
 import type { ViewerStatus } from "./messages"
 
 // The host reports load/ready/stale/error transitions to the webview via a
@@ -28,11 +29,5 @@ function isViewerStatus(value: unknown): value is ViewerStatus {
   ) {
     return false
   }
-  return (
-    value.kind === "idle" ||
-    value.kind === "loading" ||
-    value.kind === "ready" ||
-    value.kind === "stale" ||
-    value.kind === "error"
-  )
+  return VIEWER_STATUS_KINDS.some((kind) => kind === value.kind)
 }
