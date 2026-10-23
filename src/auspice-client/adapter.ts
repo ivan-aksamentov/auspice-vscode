@@ -5,7 +5,7 @@ import { createStateFromQueryOrJSONs } from "@auspice/actions/recomputeReduxStat
 import type { MainInput, ParsedInputs, ViewerDiagnostic } from "./input"
 import { applyInitialPanels, applyMapSetting, canDrawMaps } from "./panelSettings"
 import type { InitialPanels } from "./panelSettings"
-import { setViewerSettings, store } from "./store"
+import { setMapsAvailable, store } from "./store"
 
 export function loadIntoAuspice(
   inputs: ParsedInputs,
@@ -31,7 +31,7 @@ export function loadIntoAuspice(
   }
   const showMaps = canDrawMaps()
   // Before the dataset, so that its panels leave out a map that cannot be drawn (see `choosePanels`)
-  dispatch(setViewerSettings({ mapsAvailable: showMaps }))
+  dispatch(setMapsAvailable(showMaps))
   if (!showMaps && hasGeoResolutions(main.json)) {
     diagnostics.push({
       resourceIndex: main.resourceIndex,
@@ -49,27 +49,24 @@ export function loadIntoAuspice(
   const second = selectMain(inputs, 1)
   const secondJson = second === undefined ? false : applySettings(second.json, settings)
   const measurementsData = findSidecar(inputs, main, "measurements")?.json
+  const state = createStateFromQueryOrJSONs({
+    json: mainJson,
+    secondTreeDataset: secondJson,
+    query: {},
+    mainTreeName: main.datasetName,
+    ...(measurementsData === undefined ? {} : { measurementsData }),
+    ...(second === undefined ? {} : { secondTreeName: second.datasetName }),
+    ...(inputs.narrative === undefined ? {} : { narrativeBlocks: inputs.narrative.blocks }),
+    dispatch,
+  })
+  // The setting decides whether the docked sidebar starts open; a narrow viewer starts with the
+  // sidebar closed over the panels and keeps this state for when it docks (see `sidebarAfter`)
   dispatch({
     type: "CLEAN_START",
     pathnameShouldBe: "",
-    ...createStateFromQueryOrJSONs({
-      json: mainJson,
-      secondTreeDataset: secondJson,
-      query: {},
-      mainTreeName: main.datasetName,
-      ...(measurementsData === undefined ? {} : { measurementsData }),
-      ...(second === undefined ? {} : { secondTreeName: second.datasetName }),
-      ...(inputs.narrative === undefined ? {} : { narrativeBlocks: inputs.narrative.blocks }),
-      dispatch,
-    }),
+    ...state,
+    controls: withSidebarState(state["controls"], sidebarInitialState),
   })
-  // Auspice derives the initial sidebar state from `window.innerWidth`, so in a
-  // narrow webview it would start collapsed. The controls are the primary way to
-  // drive the viewer, so open the sidebar by default; the fold tab still lets the
-  // user collapse it.
-  if (sidebarInitialState !== "dataset") {
-    dispatch({ type: "TOGGLE_SIDEBAR", value: sidebarInitialState === "open" })
-  }
   if (!isCurrent()) return diagnostics
   dispatch({ type: "CHANGE_LANGUAGE", data: locale })
   dispatch({ type: "PAGE_CHANGE", displayComponent: "main" })
@@ -87,6 +84,18 @@ export function loadIntoAuspice(
     })
   }
   return diagnostics
+}
+
+/**
+ * Return Auspice's initial controls with the sidebar state of the `sidebarInitialState` setting.
+ * Auspice derives its own from the dataset, else from the window width.
+ */
+function withSidebarState(
+  controls: unknown,
+  sidebarInitialState: "open" | "closed" | "dataset",
+): unknown {
+  if (sidebarInitialState === "dataset" || !isRecord(controls)) return controls
+  return { ...controls, sidebarOpen: sidebarInitialState === "open" }
 }
 
 function applySettings(

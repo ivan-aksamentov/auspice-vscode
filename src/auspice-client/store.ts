@@ -1,26 +1,29 @@
 import { hasMultipleGridPanels } from "@auspice/actions/panelDisplay"
-import { REMOVE_TREE_TOO, UPDATE_METADATA } from "@auspice/actions/types"
+import { CLEAN_START, REMOVE_TREE_TOO, UPDATE_METADATA } from "@auspice/actions/types"
 import { changeURLMiddleware } from "@auspice/middleware/changeURL"
 import { performanceFlags } from "@auspice/middleware/performanceFlags"
 import { keepScatterplotStateInSync } from "@auspice/middleware/scatterplot"
 import auspiceReducer from "@auspice/reducers"
 import type { AuspiceState } from "@auspice/reducers"
+import { controlsHiddenWidth } from "@auspice/util/globals"
 import { configureStore } from "@reduxjs/toolkit"
 import type { Action } from "redux"
 
 import { choosePanels } from "./panels"
+import { isSidebarOverlay, sidebarAfter } from "./sidebar"
 
-/** Type of the action that sets the viewer settings */
-const VIEWER_SETTINGS = "auspice-vscode/VIEWER_SETTINGS"
+/** Type of the action that sets whether the window can draw maps */
+const MAPS_AVAILABLE = "auspice-vscode/MAPS_AVAILABLE"
 
 /** Auspice's actions after which it turns every available panel on */
 const PANEL_RESETS: ReadonlySet<string> = new Set([UPDATE_METADATA, REMOVE_TREE_TOO])
 
-const initialViewerSettings: ViewerSettings = { mapsAvailable: false }
+const initialViewer: Viewer = { mapsAvailable: false, dockedSidebarOpen: true }
 
 /**
  * The store of the viewer: Auspice's store (`src/store.ts`), with the same middleware, whose state
- * also holds the viewer settings, and which keeps the user's choice of panels (see `choosePanels`).
+ * also holds the viewer's own state, and which keeps the user's choice of panels (see
+ * `choosePanels`) and lays the sidebar over the panels of a narrow viewer (see `sidebarAfter`).
  * Auspice's components reach it through the react-redux `Provider`.
  */
 export const store = configureStore({
@@ -34,54 +37,77 @@ export const store = configureStore({
     ),
 })
 
-/** Return the action that sets the viewer settings */
-export function setViewerSettings(settings: ViewerSettings): ViewerAction {
-  return { type: VIEWER_SETTINGS, ...settings }
+/** Return the action that sets whether this window can draw the map, which needs WebGL */
+export function setMapsAvailable(mapsAvailable: boolean): ViewerAction {
+  return { type: MAPS_AVAILABLE, mapsAvailable }
 }
 
 /** An action of Auspice or of the viewer */
 export type ViewerAction = Action<string> & Readonly<Record<string, unknown>>
 
-/** Auspice's state and the viewer settings */
-export type ViewerState = AuspiceState & { readonly viewerSettings: ViewerSettings }
+/** Auspice's state and the viewer's own state */
+export type ViewerState = AuspiceState & { readonly viewer: Viewer }
 
-/** Settings of the viewer that Auspice's state has no place for */
-export interface ViewerSettings {
+/** State of the viewer that Auspice's state has no place for */
+export interface Viewer {
   /** Whether this window can draw the map, which needs WebGL */
   readonly mapsAvailable: boolean
+  /** The open state of the docked sidebar, kept while the sidebar lies over the panels */
+  readonly dockedSidebarOpen: boolean
 }
 
 /**
- * Run Auspice's reducer on its part of the state, then keep the viewer settings and the panels.
- * Return the same state when nothing changes.
+ * Run Auspice's reducer on its part of the state, then apply the viewer's rules for the panels and
+ * the sidebar. Return the same state when nothing changes.
  */
 function viewerReducer(state: ViewerState | undefined, action: ViewerAction): ViewerState {
   const previous = state === undefined ? undefined : auspiceStateOf(state)
   const next = auspiceReducer(previous, action)
-  const settings = nextViewerSettings(state?.viewerSettings ?? initialViewerSettings, action)
+  const viewer = state?.viewer ?? initialViewer
+  const mapsAvailable =
+    action.type === MAPS_AVAILABLE ? action["mapsAvailable"] === true : viewer.mapsAvailable
   const panels = choosePanels({
     previous: previous?.controls,
     next: next.controls,
     keepUserChoices: PANEL_RESETS.has(action.type),
-    mapsAvailable: settings.mapsAvailable,
+    mapsAvailable,
   })
-  const controls =
+  const sidebar = sidebarAfter({
+    previous:
+      previous === undefined
+        ? undefined
+        : {
+            state: { open: previous.controls.sidebarOpen, dockedOpen: viewer.dockedSidebarOpen },
+            overlay: isOverlay(previous),
+          },
+    next: {
+      state: { open: next.controls.sidebarOpen, dockedOpen: viewer.dockedSidebarOpen },
+      overlay: isOverlay(next),
+    },
+    loaded: action.type === CLEAN_START,
+  })
+  // Auspice decides whether Full and Grid can be chosen, unless the panels change here
+  const panelControls =
     panels === next.controls
+      ? {}
+      : { ...panels, canTogglePanelLayout: hasMultipleGridPanels(panels.panelsToDisplay) }
+  const controls =
+    panels === next.controls && sidebar.open === next.controls.sidebarOpen
       ? next.controls
-      : {
-          ...next.controls,
-          ...panels,
-          canTogglePanelLayout: hasMultipleGridPanels(panels.panelsToDisplay),
-        }
+      : { ...next.controls, ...panelControls, sidebarOpen: sidebar.open }
+  const nextViewer =
+    mapsAvailable === viewer.mapsAvailable && sidebar.dockedOpen === viewer.dockedSidebarOpen
+      ? viewer
+      : { mapsAvailable, dockedSidebarOpen: sidebar.dockedOpen }
   if (
     state !== undefined &&
     next === previous &&
     controls === next.controls &&
-    settings === state.viewerSettings
+    nextViewer === viewer
   ) {
     return state
   }
-  return { ...next, controls, viewerSettings: settings }
+  return { ...next, controls, viewer: nextViewer }
 }
 
 /**
@@ -89,12 +115,11 @@ function viewerReducer(state: ViewerState | undefined, action: ViewerAction): Vi
  * changes nothing.
  */
 function auspiceStateOf(state: ViewerState): AuspiceState {
-  const { viewerSettings: _viewerSettings, ...auspiceState } = state
+  const { viewer: _viewer, ...auspiceState } = state
   return auspiceState
 }
 
-function nextViewerSettings(settings: ViewerSettings, action: ViewerAction): ViewerSettings {
-  if (action.type !== VIEWER_SETTINGS) return settings
-  const mapsAvailable = action["mapsAvailable"] === true
-  return mapsAvailable === settings.mapsAvailable ? settings : { mapsAvailable }
+/** Return whether the sidebar lies over the panels, from the viewer width in the state */
+function isOverlay(state: AuspiceState): boolean {
+  return isSidebarOverlay(state.browserDimensions.browserDimensions.width, controlsHiddenWidth)
 }

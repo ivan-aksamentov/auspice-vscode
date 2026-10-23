@@ -38,9 +38,9 @@ export function App(): React.ReactElement {
   // Auspice components switch to a "mobile" variant whenever `window.innerWidth`
   // is below its breakpoint. A webview pane is routinely narrower than that, so
   // the viewer would render mobile controls on a full-size desktop. The shell
-  // always docks the sidebar, so pin the store to desktop mode. Auspice's
-  // `<Monitor>` (which would flip this back on window resize) is not mounted
-  // here, so a single dispatch holds.
+  // lays the sidebar over the panels of a narrow viewer instead (`sidebar.ts`),
+  // so pin the store to desktop mode. Auspice's `<Monitor>` (which would flip
+  // this back on window resize) is not mounted here, so a single dispatch holds.
   useEffect(() => {
     store.dispatch({ type: TOGGLE_MOBILE_DISPLAY, value: false })
   }, [])

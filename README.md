@@ -40,7 +40,7 @@ Alternatively, open the Extensions view, select **Views and More Actions...**, c
 - **Sidecars**: sibling `_tip-frequencies`, `_measurements`, and `_root-sequence` files attach automatically.
 - **Metadata**: apply CSV, TSV, XLSX, or node-data JSON to the active view.
 - **Comparison and narratives**: open a second tree in a tangle view, or render a local Markdown narrative with its referenced datasets.
-- **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels. The tab on its edge folds it away and back; the tree always fills the space beside it.
+- **Full sidebar**: the stock Auspice controls for color, filters, dates, animation, layout, labels, and panels. The tab on its edge folds it away and back. In a viewer wider than 780 px the sidebar sits beside the panels; in a narrower one it opens over them, and Escape or a click beside it closes it.
 - **Tree first**: a viewer starts with only the tree. The sidebar has a toggle for each other panel of the dataset: Map, Entropy, Frequency, and Measurements. Added metadata keeps the panels that you turned off, and turns on the map when it brings coordinates.
 - **Maps**: the map draws Natural Earth 5.1.2 country outlines, borders, and names that ship with the extension, so it makes no network request. Maps need WebGL; a window without it (e.g. with hardware acceleration disabled) hides the map and reports why.
 - **Downloads**: the buttons in the title row of the tree save the current view as a figure (SVG), an Auspice dataset (JSON), a Newick tree (NWK), the metadata of the shown tips (TSV), or the genetic diversity data (Entropy TSV). The figure has a caption with the dataset title, the shown tips and the Auspice citation. The save dialog proposes a file next to the dataset, named after it.
@@ -95,7 +95,8 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
   //   integer 1-1024 [default 256]
   "auspiceVscode.resourceLimitMiB": 256,
 
-  // Initial sidebar state for new or reloaded tabs.
+  // Initial sidebar state for new or reloaded tabs. A viewer of at most 780 px starts with the sidebar closed
+  // over the panels, and uses this state when it becomes wider.
   //   "open" [default]: open the Auspice controls when a viewer starts
   //   "closed": start with the controls folded
   //   "dataset": use the dataset's declared sidebar default

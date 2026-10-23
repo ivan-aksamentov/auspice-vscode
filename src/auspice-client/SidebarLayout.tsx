@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import { IconChevronLeft, IconChevronRight } from "./icons"
 
@@ -7,8 +7,10 @@ const SIDEBAR_ID = "auspice-vscode-sidebar"
 /**
  * Layout of the viewer: the sidebar on the left of the panel area, toggled by a pull tab on its
  * edge. The tab stays on the edge in both states, so the toggle never moves away from the pointer
- * and the closed sidebar costs only the width of the tab. The sidebar always sits next to the
- * panels, never over them, so a change in the sidebar shows in the panels at once.
+ * and the closed sidebar costs only the width of the tab. In a wide viewer the sidebar sits next to
+ * the panels, so a change in the sidebar shows in the panels at once. In a narrow viewer
+ * (`overlay`) it lies over the panels, as in Auspice: a backdrop dims the uncovered panels, and a
+ * click on it or Escape closes the sidebar.
  *
  * Only the sidebar moves while it opens or closes, and only by `transform`, which the browser
  * animates without layout. The panel area changes width once, after the slide: re-drawing the
@@ -17,10 +19,13 @@ const SIDEBAR_ID = "auspice-vscode-sidebar"
  */
 export function SidebarLayout({
   open,
+  overlay,
   width,
   label,
+  tabSubject,
   theme,
   onToggle,
+  onClose,
   sidebar,
   children,
 }: SidebarLayoutProps): React.ReactElement {
@@ -40,7 +45,16 @@ export function SidebarLayout({
     sidebarElement.inert = !open
   }, [open])
 
-  const tabLabel = open ? "Hide sidebar" : "Show sidebar"
+  const tabLabel = `${open ? "Hide" : "Show"} ${tabSubject}`
+  // A control that handles Escape itself (e.g. an open select) prevents its default
+  const closeOnEscape = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || !open) return
+      event.preventDefault()
+      onClose()
+    },
+    [open, onClose],
+  )
   const style = useMemo<SidebarStyle>(
     () => ({
       "--auspice-vscode-sidebar-width": `${width}px`,
@@ -55,8 +69,29 @@ export function SidebarLayout({
   )
 
   return (
-    <div className="auspice-vscode-layout" style={style}>
-      <div ref={railRef} className="auspice-vscode-rail" data-state={open ? "open" : "closed"}>
+    <div
+      className="auspice-vscode-layout"
+      style={style}
+      data-sidebar-mode={overlay ? "overlay" : "docked"}
+    >
+      {overlay ? (
+        // The pull tab and Escape close the sidebar by keyboard, so the backdrop is for the pointer
+        // only
+        <div
+          className="auspice-vscode-backdrop"
+          data-state={open ? "open" : "closed"}
+          aria-hidden="true"
+          onClick={onClose}
+        />
+      ) : null}
+      {/* The rail is no control itself: it hears Escape from the controls in the sidebar */}
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div
+        ref={railRef}
+        className="auspice-vscode-rail"
+        data-state={open ? "open" : "closed"}
+        onKeyDown={overlay ? closeOnEscape : undefined}
+      >
         <aside
           ref={sidebarRef}
           id={SIDEBAR_ID}
@@ -80,7 +115,7 @@ export function SidebarLayout({
       </div>
       <div
         className="auspice-vscode-panel-area"
-        data-sidebar-space={reserved ? "reserved" : "free"}
+        data-sidebar-space={reserved && !overlay ? "reserved" : "free"}
       >
         {children}
       </div>
@@ -90,13 +125,18 @@ export function SidebarLayout({
 
 export interface SidebarLayoutProps {
   readonly open: boolean
+  /** Whether the sidebar lies over the panels instead of beside them */
+  readonly overlay: boolean
   /** Width of the open sidebar */
   readonly width: number
   /** Name of the sidebar region for assistive technology */
   readonly label: string
+  /** What the pull tab shows and hides, e.g. "Auspice controls" */
+  readonly tabSubject: string
   /** Colors and font of the sidebar, as Auspice's sidebar theme defines them */
   readonly theme: SidebarTheme
   readonly onToggle: () => void
+  readonly onClose: () => void
   readonly sidebar: React.ReactNode
   readonly children: React.ReactNode
 }

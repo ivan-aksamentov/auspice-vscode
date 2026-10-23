@@ -26,8 +26,9 @@
 
 /*
  * The sidebar layout (`SidebarLayout`). The rail holds the sidebar and its pull tab and slides by
- * `transform` only. The panel area beside it changes width once, after the slide, through
- * `data-sidebar-space`. The sidebar never covers more than all but 40 px of the panel area.
+ * `transform` only, with Auspice's timing. The panel area beside it changes width once, after the
+ * slide, through `data-sidebar-space`. The sidebar never covers more than all but 40 px of the
+ * panel area, so that a strip of the backdrop stays to click in a narrow viewer.
  */
 /*
  * Auspice has no dark theme, so the layout keeps light form controls and scrollbars in dark editor
@@ -49,7 +50,7 @@
   position: absolute;
   top: 0;
   transform: translateX(0);
-  transition: transform 0.15s ease-out;
+  transition: transform 0.3s ease-out;
   width: var(--auspice-vscode-sidebar-width);
   will-change: transform;
   z-index: 3;
@@ -59,8 +60,33 @@
   transform: translateX(-100%);
 }
 
+/* Over the panels, the open sidebar casts a shadow on them */
+.auspice-vscode-layout[data-sidebar-mode="overlay"] .auspice-vscode-rail[data-state="open"] {
+  box-shadow: 2px 0 6px var(--auspice-vscode-sidebar-shadow);
+}
+
+/*
+ * The backdrop over the panels that the sidebar leaves uncovered in a narrow viewer, as Auspice's
+ * `overlayStyles`. It takes no clicks while it is faded out.
+ */
+.auspice-vscode-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.3s ease-out;
+  z-index: 2;
+}
+
+.auspice-vscode-backdrop[data-state="open"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .auspice-vscode-rail {
+  .auspice-vscode-rail,
+  .auspice-vscode-backdrop {
     transition: none;
   }
 }
@@ -91,7 +117,8 @@
 /*
  * The pull tab on the right edge of the sidebar, in the sidebar's colors. It starts 3 px inside the
  * sidebar, over its edge shadow, and continues that shadow around its outline; the clip path cuts
- * the shadow on its left side, so no line shows between the tab and the sidebar.
+ * the shadow on its left side, so no line shows between the tab and the sidebar. Its visible part
+ * has the size and place of Auspice's closed sidebar tab: 14 x 44 px, 4 px from the top.
  */
 .auspice-vscode-pull-tab {
   align-items: center;
@@ -111,8 +138,8 @@
   left: calc(100% - 3px);
   padding: 0 0 0 3px;
   position: absolute;
-  top: 0;
-  width: 15px;
+  top: 4px;
+  width: 17px;
 }
 
 .auspice-vscode-pull-tab:hover {

@@ -90,10 +90,7 @@ function addMetadata(resources: readonly Resource[]): void {
   Promise.resolve(store.dispatch(handleFilesDropped(transfer.files)))
     .then(() => {
       // Coordinates make the map available, which this window may be unable to draw
-      if (
-        geoResolutionCount() > geoResolutionsBefore &&
-        !store.getState().viewerSettings.mapsAvailable
-      ) {
+      if (geoResolutionCount() > geoResolutionsBefore && !store.getState().viewer.mapsAvailable) {
         dispatchStatus({
           kind: "warning",
           message:

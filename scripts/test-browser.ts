@@ -332,9 +332,10 @@ const scenarios: readonly Scenario[] = [
     async run() {
       // Long tip names leave the time axis of a narrow tree panel shorter than the minimum
       // spacing of date grid lines (130 px). Auspice then divided the time range by zero grid
-      // intervals and stepped towards an unreachable date, which froze the page.
+      // intervals and stepped towards an unreachable date, which froze the page. In a viewer this
+      // narrow, the sidebar lies closed over the panels, so the tree takes the whole width.
       const { page, pageErrors } = await openViewer(timeTreeDataset, {
-        viewport: { width: 560, height: 600 },
+        viewport: { width: 300, height: 600 },
       })
       await page.locator("#MainTree .tipLabel").getByText(LONG_TIP_NAME, { exact: true }).waitFor()
       const axisWidth = await page.evaluate(() => {
@@ -456,7 +457,7 @@ const scenarios: readonly Scenario[] = [
     name: "folds the sidebar with its pull tab and gives its space to the panels",
     async run() {
       const { page, pageErrors } = await openViewer(tipLabelDataset)
-      const tab = page.getByRole("button", { name: "Hide sidebar" })
+      const tab = page.getByRole("button", { name: "Hide Auspice controls" })
       const sidebar = page.getByRole("complementary", { name: "Controls" })
       const panelArea = page.locator(".auspice-vscode-panel-area")
       await page.locator("#MainTree .tip").first().waitFor()
@@ -466,7 +467,7 @@ const scenarios: readonly Scenario[] = [
       await tab.click()
       // The panels widen once the sidebar has slid away
       await page.locator('.auspice-vscode-panel-area[data-sidebar-space="free"]').waitFor()
-      const showTab = page.getByRole("button", { name: "Show sidebar" })
+      const showTab = page.getByRole("button", { name: "Show Auspice controls" })
       assert.equal(await showTab.getAttribute("aria-expanded"), "false")
       assert.equal(
         await sidebar.evaluate((element) => element instanceof HTMLElement && element.inert),
@@ -488,7 +489,10 @@ const scenarios: readonly Scenario[] = [
         await sidebar.evaluate((element) => element instanceof HTMLElement && element.inert),
         false,
       )
-      assert.equal(await page.getByRole("button", { name: "Hide sidebar" }).isVisible(), true)
+      assert.equal(
+        await page.getByRole("button", { name: "Hide Auspice controls" }).isVisible(),
+        true,
+      )
       await page.waitForFunction(
         (width) =>
           Number(document.getElementById("MainTree")?.closest("svg")?.getAttribute("width")) ===
@@ -502,11 +506,55 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "lays the sidebar over the panels of a narrow viewer and docks it again in a wide one",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset, {
+        viewport: { width: 700, height: 600 },
+      })
+      await page.locator("#MainTree .tip").first().waitFor()
+      const rail = page.locator(".auspice-vscode-rail")
+      const backdrop = page.locator(".auspice-vscode-backdrop")
+      const panelArea = page.locator(".auspice-vscode-panel-area")
+      // Oracle: Auspice starts the sidebar closed in a viewer of at most 780 px
+      // (`controlsHiddenWidth`), and lays it over the panels
+      assert.equal(await rail.getAttribute("data-state"), "closed")
+      const closedBox = await panelArea.boundingBox()
+      const showTab = page.getByRole("button", { name: "Show Auspice controls" })
+
+      await showTab.click()
+      await page.locator('.auspice-vscode-backdrop[data-state="open"]').waitFor()
+      await backdrop.evaluate((element) =>
+        Promise.all(element.getAnimations().map((animation) => animation.finished)),
+      )
+      const openBox = await panelArea.boundingBox()
+      assert.equal(openBox?.width, closedBox?.width)
+      assert.equal(await panelArea.getAttribute("data-sidebar-space"), "free")
+
+      // Escape inside the sidebar closes it
+      await page.getByRole("button", { name: "Hide Auspice controls" }).focus()
+      await page.keyboard.press("Escape")
+      await page.locator('.auspice-vscode-rail[data-state="closed"]').waitFor()
+
+      // A click on the backdrop beside the sidebar closes it
+      await showTab.click()
+      await page.locator('.auspice-vscode-backdrop[data-state="open"]').waitFor()
+      await page.mouse.click(690, 300)
+      await page.locator('.auspice-vscode-rail[data-state="closed"]').waitFor()
+
+      // In a wide viewer the sidebar docks with its state from the setting, here open
+      await page.setViewportSize({ width: 1_400, height: 900 })
+      await page.locator('.auspice-vscode-panel-area[data-sidebar-space="reserved"]').waitFor()
+      assert.equal(await rail.getAttribute("data-state"), "open")
+      assert.equal(await backdrop.count(), 0)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
     name: "starts with the sidebar folded when the setting asks for it",
     async run() {
       const { page, pageErrors } = await openViewer(tipLabelDataset, { sidebar: "closed" })
       await page.locator("#MainTree .tip").first().waitFor()
-      const tab = page.getByRole("button", { name: "Show sidebar" })
+      const tab = page.getByRole("button", { name: "Show Auspice controls" })
       assert.equal(await tab.getAttribute("aria-expanded"), "false")
       assert.equal(
         await page.locator(".auspice-vscode-panel-area").getAttribute("data-sidebar-space"),
@@ -613,10 +661,10 @@ const scenarios: readonly Scenario[] = [
   {
     name: "puts the title row above the tree card where the card is narrow",
     async run() {
-      // With the sidebar open, a 700 px viewer leaves the tree card too narrow for the downloads
-      // and the summary beside the zoom buttons
+      // A 600 px viewer leaves the tree card too narrow for the downloads and the summary beside
+      // the zoom buttons
       const { page, pageErrors } = await openViewer(tipLabelDataset, {
-        viewport: { width: 700, height: 520 },
+        viewport: { width: 600, height: 520 },
       })
       await page.locator("#MainTree .tip").first().waitFor()
       assert.equal(await headerLayout(page), "stacked")

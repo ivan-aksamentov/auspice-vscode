@@ -16,7 +16,7 @@ import { renderNarrativeToggle } from "@auspice/components/narrative/renderNarra
 import Tree from "@auspice/components/tree"
 import { calcUsableWidth } from "@auspice/util/computeResponsive"
 import ErrorBoundary from "@auspice/util/errorBoundary"
-import { narrativeNavBarHeight } from "@auspice/util/globals"
+import { controlsHiddenWidth, narrativeNavBarHeight } from "@auspice/util/globals"
 import React, { Suspense, lazy, useCallback, useEffect, useMemo } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import type { Dispatch } from "redux"
@@ -26,6 +26,7 @@ import { ViewerSplash } from "./components"
 import { DatasetHeader } from "./DatasetHeader"
 import { panelSizes } from "./layout"
 import type { PanelSize } from "./layout"
+import { isSidebarOverlay } from "./sidebar"
 import { SidebarLayout } from "./SidebarLayout"
 import { TreePanel } from "./TreePanel"
 import { useElementSize } from "./useElementSize"
@@ -56,9 +57,13 @@ function LoadedViewer(): React.ReactElement {
     (state: ViewerState) => state.browserDimensions.browserDimensions,
   )
   const { sidebarWidth } = calcStyles(browserDimensions, narrativeDisplayed, true, false)
+  const overlay = isSidebarOverlay(browserDimensions.width, controlsHiddenWidth)
   const toggleSidebar = useCallback(() => {
     dispatch({ type: TOGGLE_SIDEBAR, value: !sidebarOpen })
   }, [dispatch, sidebarOpen])
+  const closeSidebar = useCallback(() => {
+    dispatch({ type: TOGGLE_SIDEBAR, value: false })
+  }, [dispatch])
   useFilesDropped()
 
   const narrativeHeight = browserDimensions.height - narrativeNavBarHeight
@@ -83,10 +88,13 @@ function LoadedViewer(): React.ReactElement {
       </ErrorBoundary>
       <SidebarLayout
         open={sidebarOpen}
+        overlay={overlay}
         width={sidebarWidth}
         label={narrativeDisplayed ? "Narrative" : "Controls"}
+        tabSubject={narrativeDisplayed ? "narrative" : "Auspice controls"}
         theme={sidebarTheme}
         onToggle={toggleSidebar}
+        onClose={closeSidebar}
         sidebar={sidebar}
       >
         <Panels />

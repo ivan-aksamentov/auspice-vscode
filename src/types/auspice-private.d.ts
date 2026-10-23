@@ -1,16 +1,19 @@
 declare module "@auspice/reducers" {
   import type { Reducer } from "redux"
 
-  /** Auspice's root state, with the parts that the viewer changes */
+  /** Auspice's root state, with the parts that the viewer reads or changes */
   export interface AuspiceState {
     readonly controls: AuspiceControls
+    /** Size of the viewer, which the shell measures (`BROWSER_DIMENSIONS`) */
+    readonly browserDimensions: { readonly browserDimensions: { readonly width: number } }
     readonly [part: string]: unknown
   }
 
-  /** Auspice's controls state, with the panel lists */
+  /** Auspice's controls state, with the panel lists and the sidebar state */
   interface AuspiceControls {
     readonly panelsAvailable: readonly string[]
     readonly panelsToDisplay: readonly string[]
+    readonly sidebarOpen: boolean
     readonly [control: string]: unknown
   }
 
@@ -262,6 +265,8 @@ declare module "@auspice/util/computeResponsive" {
 }
 
 declare module "@auspice/util/globals" {
+  /** Widest viewer whose sidebar lies over the panels instead of beside them */
+  export const controlsHiddenWidth: number
   export const narrativeNavBarHeight: number
   /** The style and attribution (HTML) of the map: the `mapTiles` extension, else Auspice's own */
   export function getMapTilesSettings(): { readonly style: unknown; readonly attribution: string }
@@ -357,6 +362,7 @@ declare module "@auspice/components/download/downloadModal" {
 
 declare module "@auspice/actions/types" {
   export const BROWSER_DIMENSIONS: string
+  export const CLEAN_START: string
   export const REMOVE_TREE_TOO: string
   export const TOGGLE_MOBILE_DISPLAY: string
   export const TOGGLE_SIDEBAR: string
