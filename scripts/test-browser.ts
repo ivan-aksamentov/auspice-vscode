@@ -4,6 +4,7 @@ import { resolve } from "node:path"
 
 import { chromium } from "@playwright/test"
 import type { Page } from "@playwright/test"
+import { z } from "zod"
 
 import { CLIENT_BASEMAP_DIRECTORY, CLIENT_BUNDLE_FILE } from "../src/auspiceAssets"
 import { webviewCsp } from "../src/webviewHtml"
@@ -101,6 +102,46 @@ const branchLabelDataset = {
     ],
   },
 }
+// A Nextclade output tree: a dated reference tree with a placed sequence ("placed") that has no date
+const partlyDatedDataset = {
+  version: "v2",
+  meta: { title: "Partly dated tree", panels: ["tree"] },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0, num_date: { value: 2000 } },
+    children: [
+      { name: "dated_A", node_attrs: { div: 1, num_date: { value: 2010 } } },
+      { name: "dated_B", node_attrs: { div: 2, num_date: { value: 2015 } } },
+      { name: "placed", node_attrs: { div: 1.5 } },
+    ],
+  },
+}
+// Two trees with the same genome annotation and a mutation at base 10, colored by that base
+const genotypeDataset = {
+  version: "v2",
+  meta: {
+    title: "Genotype colors of two trees",
+    panels: ["tree"],
+    display_defaults: { color_by: "gt-nuc_10" },
+    genome_annotations: { nuc: { start: 1, end: 60, strand: "+" } },
+  },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: [
+      { name: "A", node_attrs: { div: 1 }, branch_attrs: { mutations: { nuc: ["A10G"] } } },
+      { name: "B", node_attrs: { div: 1 } },
+      { name: "C", node_attrs: { div: 1 } },
+    ],
+  },
+}
+// Coordinates where the digits of latitude and longitude together are the same ("1" and "23",
+// "12" and "3"), and a row without coordinates
+const SPLIT_COORDINATES_CSV = `strain,latitude,longitude
+A,1,23
+B,12,3
+C,,
+`
 // The basemap files that a map loads
 const BASEMAP_FILES = [
   "/basemap/countries.json",
@@ -835,6 +876,131 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "draws every tip of a partly dated tree by divergence",
+    async run() {
+      // Oracle: the placed sequence has no date, so it has no position on a time axis
+      const { page, pageErrors } = await openViewer(partlyDatedDataset)
+      await page.locator("#MainTree .tip").first().waitFor()
+      assert.equal(await page.locator("#MainTree .tip").count(), 3)
+      assert.deepEqual(await tipsOutsideTreeSvg(page), [])
+      assert.equal(await page.getByRole("button", { name: "time", exact: true }).count(), 0)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "maps added coordinates that share their digits to separate places",
+    async run() {
+      const { page, pageErrors } = await openViewer(shortNameDataset)
+      await page.locator("#MainTree .tip").first().waitFor()
+      await addMetadata(page, [{ name: "places.csv", text: SPLIT_COORDINATES_CSV }])
+      await page.locator(".leaflet-container canvas").first().waitFor()
+      await mapLegend(page)
+      // Oracle: A and B are at (1, 23) and (12, 3); C has no coordinates and is left out
+      const places = await page.evaluate(
+        () =>
+          new Set(
+            [...document.querySelectorAll("#d3DemesTransmissions [transform^='translate']")].map(
+              (deme) => deme.getAttribute("transform"),
+            ),
+          ).size,
+      )
+      assert.equal(places, 2)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "exports the map after its panel is turned off and on",
+    async run() {
+      const { page, pageErrors } = await openViewer(contractDataset, { panels: "dataset" })
+      await page.locator(".leaflet-container canvas").first().waitFor()
+      const mapPanel = page.getByRole("checkbox", { name: "Show Map panel" })
+      await mapPanel.focus()
+      await page.keyboard.press("Space")
+      await page.locator(".leaflet-container").waitFor({ state: "detached" })
+      await page.keyboard.press("Space")
+      await page.locator(".leaflet-container canvas").first().waitFor()
+      const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+      const mapContent = /<svg id="map"[^>]*>(?<inner>[\s\S]*?)<\/svg>/u.exec(
+        svgExport?.content ?? "",
+      )?.groups?.["inner"]
+      assert.ok(mapContent !== undefined && mapContent.length > 0, "the exported map is empty")
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "colors the second tree by genotype",
+    async run() {
+      const { page, pageErrors } = await openViewer(genotypeDataset, {
+        secondDataset: genotypeDataset,
+      })
+      await page.locator("#SecondTree .tip").first().waitFor()
+      // Oracle: Auspice draws a tip without a color in the color of missing values, #ADB1B3
+      const missingColor = "rgb(173, 177, 179)"
+      const strokes = await page.evaluate(() =>
+        [...document.querySelectorAll("#SecondTree .tip")].map(
+          (tip) => getComputedStyle(tip).stroke,
+        ),
+      )
+      assert.equal(strokes.length, 3)
+      assert.deepEqual(
+        strokes.filter((stroke) => stroke === missingColor),
+        [],
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "gives the tree legend and the map legend their own clip paths",
+    async run() {
+      const { page, pageErrors } = await openViewer(contractDataset, { panels: "dataset" })
+      await mapLegend(page)
+      const clipIds = await page.evaluate(() =>
+        [...document.querySelectorAll('[id="LegendContainer"] clipPath')].map((clip) => clip.id),
+      )
+      // Oracle: an ID refers to the first element with it, so each clip path needs its own
+      assert.ok(clipIds.length >= 2, `clip path IDs: ${clipIds.join(", ")}`)
+      assert.equal(new Set(clipIds).size, clipIds.length, `clip path IDs: ${clipIds.join(", ")}`)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "keeps the zoomed clade when the tree panel is turned off and on",
+    async run() {
+      const { page, pageErrors } = await openViewer(entropyDataset, { panels: "dataset" })
+      await page.locator("#MainTree .tip").first().waitFor()
+      const unzoomed = await stableTipPositions(page)
+      await zoomIntoClade(page, "AB")
+      const zoomed = await stableTipPositions(page)
+      assert.notDeepEqual(zoomed, unzoomed)
+      const treePanel = page.getByRole("checkbox", { name: "Show Tree panel" })
+      await treePanel.focus()
+      await page.keyboard.press("Space")
+      await page.locator("#MainTree").waitFor({ state: "detached" })
+      await page.keyboard.press("Space")
+      await page.locator("#MainTree .tip").first().waitFor()
+      assert.deepEqual(await stableTipPositions(page), zoomed)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "draws one entropy chart after its panel is turned off and on",
+    async run() {
+      const { page, pageErrors } = await openViewer(entropyDataset, { panels: "dataset" })
+      await page.locator("#d3entropy #mainBars").waitFor({ state: "attached" })
+      const entropyPanel = page.getByRole("checkbox", { name: "Show Entropy panel" })
+      await entropyPanel.focus()
+      for (const _round of [1, 2]) {
+        await page.keyboard.press("Space")
+        await page.locator("#d3entropyParent").waitFor({ state: "detached" })
+        await page.keyboard.press("Space")
+        await page.locator("#d3entropy #mainBars").waitFor({ state: "attached" })
+      }
+      assert.equal(await page.locator("#d3entropy #mainBars").count(), 1)
+      assert.equal(await page.locator("#d3entropy #entropyYAxis").count(), 1)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
     name: "hides the map and reports why when the window has no WebGL",
     async run() {
       const { page, pageErrors } = await openViewer(contractDataset, {
@@ -1173,6 +1339,42 @@ async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
   }, svgExport?.content ?? "")
 }
 
+/** Wait for the legend of the map, which Auspice draws in the map card next to the map */
+async function mapLegend(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const card = document.querySelector(".leaflet-container")?.closest('[id$="Card"]')
+    return (card?.querySelector('[id="LegendContainer"]') ?? null) !== null
+  })
+}
+
+/** Return the positions of the tips of the main tree, once they stay in place for half a second */
+async function stableTipPositions(page: Page): Promise<number[][]> {
+  await page.evaluate(() => {
+    window.tipPositions = { last: "", stableFrames: 0 }
+  })
+  // Auspice moves the tips in staged transitions; they stop for good once the tree is drawn
+  await page.waitForFunction(
+    () => {
+      const now = JSON.stringify(
+        [...document.querySelectorAll("#MainTree .tip")].map((tip) => {
+          const rect = tip.getBoundingClientRect()
+          return [Math.round(rect.x), Math.round(rect.y)]
+        }),
+      )
+      const positions = window.tipPositions ?? { last: "", stableFrames: 0 }
+      window.tipPositions =
+        positions.last === now
+          ? { last: now, stableFrames: positions.stableFrames + 1 }
+          : { last: now, stableFrames: 0 }
+      return window.tipPositions.stableFrames >= 30
+    },
+    undefined,
+    { polling: "raf" },
+  )
+  const positions = await page.evaluate(() => window.tipPositions?.last ?? "[]")
+  return z.array(z.array(z.number())).parse(JSON.parse(positions))
+}
+
 /** Zoom the main tree into a clade by clicking its branch */
 async function zoomIntoClade(page: Page, name: string): Promise<void> {
   await page.evaluate((clade) => {
@@ -1361,5 +1563,6 @@ declare global {
   interface Window {
     viewerMessages?: readonly unknown[]
     treeButtonDownloads?: { filename: string; content: string }[]
+    tipPositions?: { last: string; stableFrames: number }
   }
 }
