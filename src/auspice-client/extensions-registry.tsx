@@ -13,6 +13,10 @@ import { TreeDownloadButtons } from "./TreeDownloadButtons"
 // Auspice names downloads after the page URL, which a webview does not have, so
 // `filePrefix` gives them a fixed name ("view.svg") that the host prefixes with
 // the dataset name in the save dialog.
+//
+// Auspice's download modal describes nextstrain.org data (data use, license,
+// publications). `downloadModal: false` turns it off; the download buttons above
+// the tree replace it.
 const registry: Record<string, unknown> = {
   sidebarTheme: {
     background: "#F2F2F2",
@@ -24,6 +28,7 @@ const registry: Record<string, unknown> = {
   },
   treeButtonsComponent: TreeDownloadButtons,
   filePrefix: "view",
+  downloadModal: false,
   entryPage: "splash",
   enableDatasetEditor: true,
   finePrint: "Auspice runs locally inside VS Code.",

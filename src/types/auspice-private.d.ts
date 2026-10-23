@@ -192,6 +192,35 @@ declare module "@auspice/util/computeResponsive" {
 
 declare module "@auspice/util/globals" {
   export const narrativeNavBarHeight: number
+  /** The style and attribution (HTML) of the map: the `mapTiles` extension, else Auspice's own */
+  export function getMapTilesSettings(): { readonly style: unknown; readonly attribution: string }
+}
+
+declare module "@auspice/util/entropy" {
+  /** Return the bars of the entropy panel for the visible tips, and their highest value */
+  export function calcEntropyInView(
+    nodes: unknown,
+    visibility: unknown,
+    selectedCds: unknown,
+    showCounts: boolean,
+  ): readonly [bars: unknown, maxYVal: number]
+}
+
+declare module "@auspice/version" {
+  export const version: string
+}
+
+declare module "@auspice/components/info/datasetSummary" {
+  import type { TFunction } from "i18next"
+
+  /** Return the sentence that describes the shown tips, e.g. "Showing 3 of 3 genomes." */
+  export function datasetSummary(options: {
+    readonly nodes: unknown
+    readonly visibility: unknown
+    readonly mainTreeNumTips: number
+    readonly branchLengthsToDisplay: string
+    readonly t: TFunction
+  }): string
 }
 
 declare module "@auspice/actions/panelDisplay" {
@@ -219,6 +248,15 @@ declare module "@auspice/components/download/helperFunctions" {
     caption?: readonly string[],
   ): Promise<void>
   export function auspiceJSON(dispatch: Dispatch, state: unknown, filePrefix: string): void
+  /** Write the metadata of the visible tips (`<filePrefix>_metadata.tsv`) */
+  export function strainTSV(
+    dispatch: Dispatch,
+    filePrefix: string,
+    nodes: unknown,
+    visibility: unknown,
+  ): void
+  /** Write the bars of the entropy panel (`<filePrefix>_diversity.tsv`) */
+  export function entropyTSV(dispatch: Dispatch, filePrefix: string, entropy: unknown): void
   export function exportTree(options: {
     readonly dispatch: Dispatch
     readonly filePrefix: string
@@ -233,7 +271,14 @@ declare module "@auspice/components/download/downloadButtons" {
 }
 
 declare module "@auspice/components/download/downloadModal" {
-  export function relevantPublications(colorBy: string): readonly unknown[]
+  interface Publication {
+    readonly author: string
+    readonly title: string
+    readonly journal: string
+    readonly year: string
+    readonly href: string
+  }
+  export const publications: { readonly nextstrain: Publication }
 }
 
 declare module "@auspice/actions/types" {

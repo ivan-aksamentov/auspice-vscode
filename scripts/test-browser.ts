@@ -233,13 +233,41 @@ const scenarios: readonly Scenario[] = [
       await page.locator(".tipLabel", { hasText: WIDE_TIP_NAME }).waitFor()
       assert.deepEqual(await treeLabelsOutsideTreeSvg(page), [])
       assert.deepEqual(await treeLabelsOutsideSvgExport(page), [])
-      const downloads = await downloadsFromTreeButtons(page, ["SVG", "JSON", "NWK"])
+      const downloads = await downloadsFromTreeButtons(page, ["SVG", "JSON", "NWK", "TSV"])
       assert.deepEqual(
         downloads.map(({ filename }) => filename),
-        ["view.svg", "view.json", "view_tree.nwk"],
+        ["view.svg", "view.json", "view_tree.nwk", "view_metadata.tsv"],
       )
       // The export embeds Lato, which it fetches from the font's `data:` URL under the webview CSP
       assert.ok(downloads[0]?.content.includes("@font-face") === true, "the SVG embeds no font")
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "writes a local caption below the SVG export and opens no download modal",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset)
+      await page.getByRole("link", { name: /^Auspice v/u }).waitFor()
+      const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+      const content = svgExport?.content ?? ""
+      assert.ok(content.includes("Tip label contract"), "the caption has no dataset title")
+      assert.ok(content.includes("Made with Auspice"), "the caption does not name the viewer")
+      // Auspice's caption names the page address, nextstrain.org's data use and a license, and a
+      // dataset without an update date as "undefined"
+      for (const text of [
+        "nextstrain.org",
+        "CC-BY",
+        "undefined",
+        "vscode-webview",
+        server.url.host,
+      ]) {
+        assert.equal(content.includes(text), false, `the SVG export contains "${text}"`)
+      }
+      // The fine print has no link to the download modal, and its key opens nothing
+      assert.equal(await page.getByRole("button", { name: "Download data" }).count(), 0)
+      await page.keyboard.press("d")
+      await nextFrames(page)
+      assert.equal(await page.getByText("Data usage policy").count(), 0)
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -251,9 +279,16 @@ const scenarios: readonly Scenario[] = [
       await zoomIntoClade(page, "AB")
       await page.locator("#d3entropyParent").getByText("data loading").waitFor()
       assert.equal(await page.locator("#d3entropyParent").getByText("data loading").count(), 1)
-      const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+      const [svgExport, entropyExport] = await downloadsFromTreeButtons(page, [
+        "SVG",
+        "Entropy TSV",
+      ])
       assert.equal(svgExport?.content.includes('<svg id="entropy"'), true)
       assert.equal(svgExport?.content.includes("data loading"), false)
+      // Oracle: the clade "AB" holds the mutations at bases 10 and 20 (`entropyDataset`), one
+      // change each
+      assert.equal(entropyExport?.filename, "view_diversity.tsv")
+      assert.equal(entropyExport?.content, "base\tevents\n10\t1\n20\t1")
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -849,23 +884,9 @@ function treeLabelsOutsideTreeSvg(page: Page, treeId = "MainTree"): Promise<stri
  * outside the image, or outside the tree panel when the panel clips its content
  */
 async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
-  await page.evaluate(() => {
-    window.svgExports = []
-    window.addEventListener("auspice-export", (event) => {
-      const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
-      if (typeof detail === "object" && detail !== null && "content" in detail) {
-        window.svgExports?.push(String(detail.content))
-      }
-    })
-  })
-  await page.getByRole("button", { name: "Download data" }).click()
-  await page.getByRole("button", { name: /^Screenshot \(SVG\)/u }).click()
-  await page.waitForFunction(() => (window.svgExports?.length ?? 0) > 0)
-  // The "d" key toggles Auspice's download modal
-  await page.keyboard.press("d")
-  await page.getByRole("button", { name: /^Screenshot \(SVG\)/u }).waitFor({ state: "detached" })
-  return page.evaluate(() => {
-    const exported = new DOMParser().parseFromString(window.svgExports?.[0] ?? "", "image/svg+xml")
+  const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+  return page.evaluate((content) => {
+    const exported = new DOMParser().parseFromString(content, "image/svg+xml")
     const image = document.importNode(exported.documentElement, true)
     document.body.append(image)
     const imageRect = image.getBoundingClientRect()
@@ -900,7 +921,7 @@ async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
       .map((label) => label.textContent ?? "")
     image.remove()
     return outside
-  })
+  }, svgExport?.content ?? "")
 }
 
 /** Zoom the main tree into a clade by clicking its branch */
@@ -918,13 +939,28 @@ async function zoomIntoClade(page: Page, name: string): Promise<void> {
   await page.getByTestId("zoom-branch").click()
 }
 
+/** Wait until the page has rendered two more frames, so that the updates of an input show */
+async function nextFrames(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const frames = Promise.withResolvers<void>()
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        frames.resolve()
+      })
+    })
+    return frames.promise
+  })
+}
+
 /** Press download buttons of the tree panel and return the downloaded files */
 async function downloadsFromTreeButtons(
   page: Page,
   buttons: readonly string[],
 ): Promise<{ filename: string; content: string }[]> {
   await page.evaluate(() => {
+    const listening = window.treeButtonDownloads !== undefined
     window.treeButtonDownloads = []
+    if (listening) return
     window.addEventListener("auspice-export", (event) => {
       const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
       if (
@@ -1002,7 +1038,6 @@ async function loadFiles(
 declare global {
   interface Window {
     viewerMessages?: readonly unknown[]
-    svgExports?: string[]
     treeButtonDownloads?: { filename: string; content: string }[]
   }
 }
