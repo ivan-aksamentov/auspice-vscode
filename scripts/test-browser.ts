@@ -6,6 +6,7 @@ import { chromium } from "@playwright/test"
 import type { Page } from "@playwright/test"
 
 import { CLIENT_BUNDLE_FILE } from "../src/auspiceAssets"
+import { webviewCsp } from "../src/webviewHtml"
 
 const contractDataset = {
   version: "v2",
@@ -191,7 +192,8 @@ function commandPath(command: string): string | undefined {
 const server = Bun.serve({
   port: 0,
   routes: {
-    "/": new Response(browserHtml(), { headers: { "Content-Type": "text/html" } }),
+    "/": () => browserPage({ mapsEnabled: false }),
+    "/maps": () => browserPage({ mapsEnabled: true }),
     [`/${CLIENT_BUNDLE_FILE}`]: new Response(bundle, {
       headers: { "Content-Type": "text/javascript" },
     }),
@@ -236,6 +238,8 @@ const scenarios: readonly Scenario[] = [
         downloads.map(({ filename }) => filename),
         ["view.svg", "view.json", "view_tree.nwk"],
       )
+      // The export embeds Lato, which it fetches from the font's `data:` URL under the webview CSP
+      assert.ok(downloads[0]?.content.includes("@font-face") === true, "the SVG embeds no font")
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -611,8 +615,10 @@ const scenarios: readonly Scenario[] = [
     },
   },
 ]
+// An argument runs only the scenarios whose name contains it
+const nameFilter = process.argv[2] ?? ""
 try {
-  for (const scenario of scenarios) {
+  for (const scenario of scenarios.filter(({ name }) => name.includes(nameFilter))) {
     try {
       await scenario.run()
     } catch (error: unknown) {
@@ -624,19 +630,30 @@ try {
   await server.stop(true)
 }
 
-function browserHtml(): string {
-  return `<!doctype html>
+/**
+ * Return the test page of the client: the webview shell with the production Content Security
+ * Policy, and a stub of the VS Code API that records the messages that the client posts
+ */
+function browserPage({ mapsEnabled }: { readonly mapsEnabled: boolean }): Response {
+  const nonce = crypto.randomUUID().replaceAll("-", "")
+  const csp = webviewCsp({ cspSource: server.url.origin, mapsEnabled, nonce })
+  const html = `<!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><style>html,body,#root{width:100%;height:100%;margin:0}</style></head>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="${csp}">
+    <style>html,body,#root{width:100%;height:100%;margin:0}</style>
+  </head>
   <body>
     <div id="root"></div>
-    <script>
+    <script nonce="${nonce}">
       window.viewerMessages = [];
       window.acquireVsCodeApi = () => ({ postMessage: (message) => window.viewerMessages.push(message) });
     </script>
-    <script type="module" src="/${CLIENT_BUNDLE_FILE}"></script>
+    <script type="module" nonce="${nonce}" src="/${CLIENT_BUNDLE_FILE}"></script>
   </body>
 </html>`
+  return new Response(html, { headers: { "Content-Type": "text/html" } })
 }
 
 async function openViewer(
@@ -668,12 +685,16 @@ async function openViewer(
   page.on("pageerror", (error) => pageErrors.push(error.message))
   page.on("console", (message) => {
     if (message.text().startsWith("Timer ")) consoleTimers.push(message.text())
+    // A request or script that the webview CSP blocks fails without a page error
+    if (message.type() === "error" && message.text().includes("Content Security Policy")) {
+      pageErrors.push(message.text())
+    }
   })
   await page.route("**/*", async (route) => {
     const requestUrl = new URL(route.request().url())
     await (requestUrl.origin === server.url.origin ? route.continue() : route.abort())
   })
-  await page.goto(server.url.toString())
+  await page.goto(new URL(maps ? "/maps" : "/", server.url).toString())
   await page.waitForFunction(
     () =>
       window.viewerMessages?.some(

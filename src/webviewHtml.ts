@@ -2,20 +2,7 @@
 const MAP_TILE_ORIGIN = "https://tiles.openfreemap.org"
 
 export function renderWebviewHtml(options: WebviewHtmlOptions): string {
-  // Auspice draws the map with MapLibre from OpenFreeMap vector tiles. MapLibre fetches the
-  // tiles, glyphs and sprites, and may decode raster tiles through `blob:` image URLs.
-  const mapSources = options.mapsEnabled ? ` ${MAP_TILE_ORIGIN}` : ""
-  const mapImageSources = options.mapsEnabled ? ` blob:${mapSources}` : ""
-  const connectSources = options.mapsEnabled ? mapSources.trim() : "'none'"
-  const csp = [
-    "default-src 'none'",
-    `img-src ${options.cspSource} data:${mapImageSources}`,
-    `font-src ${options.cspSource} data:`,
-    `style-src ${options.cspSource} 'unsafe-inline'`,
-    `script-src 'nonce-${options.nonce}' 'strict-dynamic'`,
-    `connect-src ${connectSources}`,
-    "worker-src blob:",
-  ].join("; ")
+  const csp = webviewCsp(options)
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -85,12 +72,37 @@ export function renderWebviewHtml(options: WebviewHtmlOptions): string {
 </html>`
 }
 
-export interface WebviewHtmlOptions {
+/**
+ * Return the Content Security Policy of the viewer webview. The SVG export embeds the Lato font by
+ * fetching it from the `data:` URL that the client bundle inlines.
+ */
+export function webviewCsp(options: WebviewCspOptions): string {
+  // Auspice draws the map with MapLibre from OpenFreeMap vector tiles. MapLibre fetches the
+  // tiles, glyphs and sprites, and may decode raster tiles through `blob:` image URLs.
+  const mapSources = options.mapsEnabled ? ` ${MAP_TILE_ORIGIN}` : ""
+  const mapImageSources = options.mapsEnabled ? ` blob:${mapSources}` : ""
+  return [
+    "default-src 'none'",
+    `img-src ${options.cspSource} data:${mapImageSources}`,
+    `font-src ${options.cspSource} data:`,
+    `style-src ${options.cspSource} 'unsafe-inline'`,
+    `script-src 'nonce-${options.nonce}' 'strict-dynamic'`,
+    `connect-src data:${mapSources}`,
+    "worker-src blob:",
+  ].join("; ")
+}
+
+export interface WebviewHtmlOptions extends WebviewCspOptions {
   readonly assets: WebviewAssetUris
+  readonly viewerScale: number
+}
+
+export interface WebviewCspOptions {
+  /** Origin of the webview's own resources (`Webview.cspSource`) */
   readonly cspSource: string
   readonly mapsEnabled: boolean
+  /** Nonce of the scripts that the page may run */
   readonly nonce: string
-  readonly viewerScale: number
 }
 
 export interface WebviewAssetUris {

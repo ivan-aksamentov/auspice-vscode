@@ -14,7 +14,9 @@ describe("webview contract", () => {
     })
 
     // VS Code's webview security model requires explicit resource URIs and deny-by-default CSP.
-    expect(actual).toContain("connect-src 'none'")
+    // Oracle: the SVG export fetches the Lato font from the `data:` URL that the bundle inlines
+    // (`latoFontDefs()` in Auspice's `components/download/embedFont.js`), and nothing else.
+    expect(actual).toContain("connect-src data:;")
     expect(actual).toContain('href="vscode-resource:/extension/favicon.png"')
     expect(actual).toContain(
       '<script type="module" nonce="test-nonce" src="vscode-resource:/extension/auspice-client.js"></script>',
@@ -47,7 +49,7 @@ describe("webview contract", () => {
     })
 
     // Auspice's default map style loads every tile, glyph and sprite from OpenFreeMap.
-    expect(actual).toContain("connect-src https://tiles.openfreemap.org;")
+    expect(actual).toContain("connect-src data: https://tiles.openfreemap.org;")
     expect(actual).toContain("img-src vscode-webview: data: blob: https://tiles.openfreemap.org;")
   })
 
