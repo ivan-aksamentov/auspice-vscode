@@ -284,6 +284,27 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "keeps the options of sidebar selects dark in a dark editor theme",
+    async run() {
+      const { page, pageErrors } = await openViewer(branchLabelDataset)
+      // VS Code's webview styles set the body text to the editor foreground, which is light in a
+      // dark theme (`--vscode-foreground` of Dark Modern)
+      await page.addStyleTag({ content: "body { color: #cccccc; }" })
+      const branchLabels = page.getByRole("combobox", { name: "Branch Labels" })
+      await branchLabels.focus()
+      await page.keyboard.press("ArrowDown")
+      // The selected option is white on blue, as react-select draws it
+      const option = page.getByRole("option", { selected: false }).first()
+      await option.waitFor()
+      // Oracle: the sidebar of the light theme writes black text on its light background
+      assert.equal(
+        await option.evaluate((element) => getComputedStyle(element).color),
+        "rgb(0, 0, 0)",
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
     name: "keeps long tip labels in the SVG export and names the downloads",
     async run() {
       const { page, pageErrors } = await openViewer(tipLabelDataset)
