@@ -1,3 +1,17 @@
+import { getFilePrefix } from "@auspice/components/download/downloadButtons"
+import { publications } from "@auspice/components/download/downloadModal"
+import {
+  SVG as writeSvg,
+  auspiceJSON,
+  entropyTSV,
+  exportTree,
+  strainTSV,
+} from "@auspice/components/download/helperFunctions"
+import { datasetSummary } from "@auspice/components/info/datasetSummary"
+import { darkGrey, tabSingle } from "@auspice/globalStyles"
+import { calcEntropyInView } from "@auspice/util/entropy"
+import { getMapTilesSettings } from "@auspice/util/globals"
+import { version } from "@auspice/version"
 import React, { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import { useSelector, useStore } from "react-redux"
@@ -9,9 +23,17 @@ import { svgCaption } from "./svgCaption"
 // Downloads of the current view: the figure (SVG), the dataset with the view as its display
 // defaults (Auspice JSON), the tree (Newick), the metadata of the shown tips (TSV), and the
 // genetic diversity data (TSV). They replace Auspice's download modal, whose texts describe
-// nextstrain.org data. Auspice reads the extension registry, which holds this component, while its
-// own modules load, so the Auspice download modules are imported when a button is pressed instead
-// of when this module loads.
+// nextstrain.org data, and offer what the modal offers: each download that the dataset's sharing
+// settings allow (e.g. no dataset and no metadata for GISAID data).
+
+/** The look of Auspice's zoom buttons, which the download buttons stand next to */
+const BUTTON_STYLE: React.CSSProperties = {
+  ...tabSingle,
+  color: darkGrey,
+  cursor: "pointer",
+  display: "inline-block",
+  marginLeft: "4px",
+}
 
 const viewStateSchema = z.object({
   metadata: z.looseObject({
@@ -36,32 +58,22 @@ const entropyStateSchema = z.object({
   tree: z.looseObject({ nodes: z.unknown(), visibility: z.unknown() }),
 })
 
-export function TreeDownloadButtons({ buttonStyle }: TreeDownloadButtonsProps): React.ReactElement {
+export function TreeDownloadButtons(): React.ReactElement {
   const store = useStore<unknown>()
   const { t } = useTranslation()
-  const entropyLoaded = useSelector((state: DownloadState) => state.entropy.loaded)
+  const sharing = useSelector((state: DownloadState) => state.metadata.sharing)
+  // Auspice parses a dataset without genome annotations to an empty genome map, so the diversity
+  // data exists only where the entropy panel does
+  const entropyAvailable = useSelector((state: DownloadState) =>
+    state.controls.panelsAvailable.includes("entropy"),
+  )
 
   const downloadSvg = useCallback(async () => {
-    const [
-      { SVG: writeSvg },
-      { getFilePrefix },
-      { publications },
-      { datasetSummary },
-      { getMapTilesSettings },
-      { version },
-    ] = await Promise.all([
-      import("@auspice/components/download/helperFunctions"),
-      import("@auspice/components/download/downloadButtons"),
-      import("@auspice/components/download/downloadModal"),
-      import("@auspice/components/info/datasetSummary"),
-      import("@auspice/util/globals"),
-      import("@auspice/version"),
-    ])
     const { metadata, tree, controls } = viewStateSchema.parse(store.getState())
     const caption = svgCaption({
-      title: metadata.title,
+      title: presentText(metadata.title),
       treeName: tree.name,
-      updated: metadata.updated,
+      updated: presentText(metadata.updated),
       summary: datasetSummary({
         nodes: tree.nodes,
         visibility: tree.visibility,
@@ -89,19 +101,11 @@ export function TreeDownloadButtons({ buttonStyle }: TreeDownloadButtonsProps): 
     )
   }, [store, t])
 
-  const downloadJson = useCallback(async () => {
-    const [{ auspiceJSON }, { getFilePrefix }] = await Promise.all([
-      import("@auspice/components/download/helperFunctions"),
-      import("@auspice/components/download/downloadButtons"),
-    ])
+  const downloadJson = useCallback(() => {
     auspiceJSON(store.dispatch, store.getState(), getFilePrefix())
   }, [store])
 
-  const downloadNewick = useCallback(async () => {
-    const [{ exportTree }, { getFilePrefix }] = await Promise.all([
-      import("@auspice/components/download/helperFunctions"),
-      import("@auspice/components/download/downloadButtons"),
-    ])
+  const downloadNewick = useCallback(() => {
     const { tree, controls } = viewStateSchema.parse(store.getState())
     exportTree({
       isNewick: true,
@@ -112,21 +116,12 @@ export function TreeDownloadButtons({ buttonStyle }: TreeDownloadButtonsProps): 
     })
   }, [store])
 
-  const downloadMetadata = useCallback(async () => {
-    const [{ strainTSV }, { getFilePrefix }] = await Promise.all([
-      import("@auspice/components/download/helperFunctions"),
-      import("@auspice/components/download/downloadButtons"),
-    ])
+  const downloadMetadata = useCallback(() => {
     const { tree } = viewStateSchema.parse(store.getState())
     strainTSV(store.dispatch, getFilePrefix(), tree.nodes, tree.visibility)
   }, [store])
 
-  const downloadEntropy = useCallback(async () => {
-    const [{ entropyTSV }, { getFilePrefix }, { calcEntropyInView }] = await Promise.all([
-      import("@auspice/components/download/helperFunctions"),
-      import("@auspice/components/download/downloadButtons"),
-      import("@auspice/util/entropy"),
-    ])
+  const downloadEntropy = useCallback(() => {
     const { entropy, tree } = entropyStateSchema.parse(store.getState())
     // Auspice computes the bars only while the entropy panel is on screen, as the SVG export does
     const bars =
@@ -137,35 +132,38 @@ export function TreeDownloadButtons({ buttonStyle }: TreeDownloadButtonsProps): 
 
   return (
     <>
-      <DownloadButton
-        label="SVG"
-        tooltip="Download the figure of the current view (SVG)"
-        style={buttonStyle}
-        download={downloadSvg}
-      />
-      <DownloadButton
-        label="JSON"
-        tooltip="Download the dataset with the current view as its display defaults (Auspice JSON)"
-        style={buttonStyle}
-        download={downloadJson}
-      />
-      <DownloadButton
-        label="NWK"
-        tooltip="Download the tree of the current view, with branch lengths in years for a time tree (Newick)"
-        style={buttonStyle}
-        download={downloadNewick}
-      />
-      <DownloadButton
-        label="TSV"
-        tooltip="Download the metadata of the shown tips (TSV)"
-        style={buttonStyle}
-        download={downloadMetadata}
-      />
-      {entropyLoaded ? (
+      {sharing.screenshot ? (
+        <DownloadButton
+          label="SVG"
+          tooltip="Download the figure of the current view (SVG)"
+          download={downloadSvg}
+        />
+      ) : null}
+      {sharing.dataset_json ? (
+        <DownloadButton
+          label="JSON"
+          tooltip="Download the dataset with the current view as its display defaults (Auspice JSON)"
+          download={downloadJson}
+        />
+      ) : null}
+      {sharing.trees ? (
+        <DownloadButton
+          label="NWK"
+          tooltip="Download the tree of the current view, with branch lengths in years for a time tree (Newick)"
+          download={downloadNewick}
+        />
+      ) : null}
+      {sharing.metadata_tsv ? (
+        <DownloadButton
+          label="TSV"
+          tooltip="Download the metadata of the shown tips (TSV)"
+          download={downloadMetadata}
+        />
+      ) : null}
+      {sharing.entropy && entropyAvailable ? (
         <DownloadButton
           label="Entropy TSV"
           tooltip="Download the genetic diversity data of the shown tips (TSV)"
-          style={buttonStyle}
           download={downloadEntropy}
         />
       ) : null}
@@ -173,26 +171,19 @@ export function TreeDownloadButtons({ buttonStyle }: TreeDownloadButtonsProps): 
   )
 }
 
-export interface TreeDownloadButtonsProps {
-  readonly buttonStyle: React.CSSProperties
-}
-
-function DownloadButton({
-  label,
-  tooltip,
-  style,
-  download,
-}: DownloadButtonProps): React.ReactElement {
+function DownloadButton({ label, tooltip, download }: DownloadButtonProps): React.ReactElement {
   const onClick = useCallback(() => {
-    download().catch((error: unknown) => {
-      console.error(`[auspice-vscode] ${label} download failed`, error)
-    })
+    Promise.resolve()
+      .then(download)
+      .catch((error: unknown) => {
+        console.error(`[auspice-vscode] ${label} download failed`, error)
+      })
   }, [download, label])
   return (
     <button
       type="button"
       className="auspice-vscode-tree-download"
-      style={style}
+      style={BUTTON_STYLE}
       title={tooltip}
       onClick={onClick}
     >
@@ -202,14 +193,29 @@ function DownloadButton({
   )
 }
 
-/** The part of Auspice's state that the buttons read */
+/** Return the text of a metadata field, which Auspice sets to "" when the dataset has none */
+function presentText(text: string | undefined): string | undefined {
+  return text === "" ? undefined : text
+}
+
+/** The parts of Auspice's state that the buttons read */
 interface DownloadState {
-  readonly entropy: { readonly loaded: boolean }
+  readonly metadata: {
+    /** Which downloads the dataset allows (`meta.sharing`, and Auspice's GISAID rules) */
+    readonly sharing: {
+      readonly dataset_json: boolean
+      readonly metadata_tsv: boolean
+      readonly trees: boolean
+      readonly entropy: boolean
+      readonly screenshot: boolean
+    }
+  }
+  readonly controls: { readonly panelsAvailable: readonly string[] }
 }
 
 interface DownloadButtonProps {
   readonly label: string
   readonly tooltip: string
-  readonly style: React.CSSProperties
-  readonly download: () => Promise<void>
+  /** Write the file; a failure, thrown or as a rejected promise, shows in the console */
+  readonly download: () => Promise<void> | void
 }

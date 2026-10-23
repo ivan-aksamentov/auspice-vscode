@@ -7,7 +7,6 @@ import AnimationController from "@auspice/components/framework/animationControll
 import FinePrint from "@auspice/components/framework/fine-print"
 import Footer from "@auspice/components/framework/footer"
 import { PanelSpinner } from "@auspice/components/framework/spinner"
-import Info from "@auspice/components/info/info"
 import { sidebarTheme } from "@auspice/components/main/styles"
 import { calcPanelDims, calcStyles } from "@auspice/components/main/utils"
 import Modal from "@auspice/components/modal/Modal.jsx"
@@ -24,9 +23,11 @@ import type { Dispatch } from "redux"
 import { ThemeProvider } from "styled-components"
 
 import { ViewerSplash } from "./components"
-import { fitPanelSizes } from "./layout"
+import { DatasetHeader } from "./DatasetHeader"
+import { panelSizes } from "./layout"
 import type { PanelSize } from "./layout"
 import { SidebarLayout } from "./SidebarLayout"
+import { TreePanel } from "./TreePanel"
 import { useElementSize } from "./useElementSize"
 
 const Entropy = lazy(() => import("@auspice/components/entropy"))
@@ -36,9 +37,9 @@ const AuspiceMap = lazy(() => import("@auspice/components/map/map"))
 
 /**
  * The viewer layout, in place of Auspice's `<Main>`: the same panels, controls, narrative and
- * modal, in a sidebar layout owned by the shell (see `SidebarLayout`) and sized from the measured
- * panel area (see `fitPanelSizes`). Auspice's `<Main>` sizes everything from the window, and opens
- * its sidebar with a tab that moves between its top corners.
+ * modal, in a sidebar layout owned by the shell (see `SidebarLayout`) and sized by Auspice's rules
+ * from the measured panel area (see `panelSizes`). Auspice's `<Main>` sizes everything from the
+ * window, and opens its sidebar with a tab that moves between its top corners.
  */
 export function ViewerMain(): React.ReactElement {
   const loaded = useSelector((state: ViewerState) => state.metadata.loaded && state.tree.loaded)
@@ -94,7 +95,7 @@ function LoadedViewer(): React.ReactElement {
   )
 }
 
-/** The panels of the dataset, as Auspice's `<Main>` shows them, sized to the panel area */
+/** The panels of the dataset, as Auspice's `<Main>` shows them, sized from the panel area */
 function Panels(): React.ReactElement {
   const dispatch = useDispatch<Dispatch>()
   const panels = useSelector((state: ViewerState) => state.controls.panelsToDisplay)
@@ -106,25 +107,25 @@ function Panels(): React.ReactElement {
   const frequenciesLoaded = useSelector((state: ViewerState) => state.frequencies.loaded)
   const treeName = useSelector((state: ViewerState) => state.tree.name)
   const area = useElementSize<HTMLDivElement>()
-  const header = useElementSize<HTMLDivElement>()
 
   const showHeader = !narrativeDisplayed && !showOnlyPanels
-  // The panels wait for the header to be measured, so that the tree is not drawn twice on load.
-  // Both measurements render before the first paint.
+  const twoTrees = typeof secondTreeName === "string"
   const sizes =
-    area.size === undefined || (showHeader && header.size === undefined)
+    area.size === undefined
       ? undefined
-      : fitPanelSizes(
-          calcPanelDims(panels, narrativeDisplayed, area.size.width, area.size.height),
-          {
-            height: area.size.height,
-            headerHeight: showHeader ? (header.size?.height ?? 0) : 0,
-            narrative: narrativeDisplayed,
-            twoTrees: typeof secondTreeName === "string",
-          },
-        )
+      : panelSizes(calcPanelDims(panels, narrativeDisplayed, area.size.width, area.size.height), {
+          narrative: narrativeDisplayed,
+        })
   // Tree names key the panels, so that they mount anew for a new dataset
-  const key = `${treeName ?? ""}${typeof secondTreeName === "string" ? `:${secondTreeName}` : ""}`
+  const key = `${treeName ?? ""}${twoTrees ? `:${secondTreeName}` : ""}`
+  const renderTree = useCallback(
+    (drawing: PanelSize) => (
+      <Panel name="tree" size={drawing}>
+        <Tree {...drawing} key={key} />
+      </Panel>
+    ),
+    [key],
+  )
   const mapInGrid = inGrid && numberOfGridPanels(panels) % 2 === 0
   // A map in the grid leaves the color swatches to the tree legend, as in Auspice's `<Main>`
   const mapLegend = useMemo(() => ({ swatches: !mapInGrid, demes: true }), [mapInGrid])
@@ -135,17 +136,17 @@ function Panels(): React.ReactElement {
       {narrativeLoaded && !panels.includes("MainDisplayMarkdown")
         ? renderNarrativeToggle(dispatch, narrativeDisplayed)
         : null}
-      {area.size !== undefined && showHeader ? (
-        <div ref={header.ref} className="auspice-vscode-panel-header">
-          <Info width={usableWidth} />
-        </div>
-      ) : null}
+      {showHeader ? <DatasetHeader /> : null}
       {sizes === undefined ? null : (
         <>
           {panels.includes("tree") ? (
-            <Panel name="tree" size={inGrid ? sizes.grid : sizes.full}>
-              <Tree {...(inGrid ? sizes.grid : sizes.full)} key={key} />
-            </Panel>
+            <TreePanel
+              card={inGrid ? sizes.grid : sizes.full}
+              twoTrees={twoTrees}
+              showHeader={showHeader}
+            >
+              {renderTree}
+            </TreePanel>
           ) : null}
           {panels.includes("measurements") ? (
             <LazyPanel name="measurements" size={inGrid ? sizes.grid : sizes.full}>

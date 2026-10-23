@@ -252,6 +252,10 @@ const scenarios: readonly Scenario[] = [
       const content = svgExport?.content ?? ""
       assert.ok(content.includes("Tip label contract"), "the caption has no dataset title")
       assert.ok(content.includes("Made with Auspice"), "the caption does not name the viewer")
+      // Auspice stores the update date of a dataset without one as ""
+      assert.equal(content.includes("Last updated"), false, "the caption has an empty date")
+      // The dataset has no genome annotations, so it has no diversity data
+      assert.equal(await page.getByRole("button", { name: "Entropy TSV" }).count(), 0)
       // Auspice's caption names the page address, nextstrain.org's data use and a license, and a
       // dataset without an update date as "undefined"
       for (const text of [
@@ -274,8 +278,22 @@ const scenarios: readonly Scenario[] = [
   {
     name: "exports the genetic diversity bars of a panel below the fold",
     async run() {
-      const { page, pageErrors } = await openViewer(entropyDataset, { panels: "dataset" })
-      await page.locator("#d3entropyParent").waitFor()
+      // Auspice gives the tree 88 % of the panel area, so in a short view the entropy panel
+      // starts below the dataset header and the tree
+      const { page, pageErrors } = await openViewer(entropyDataset, {
+        panels: "dataset",
+        viewport: { width: 1_400, height: 380 },
+      })
+      await page.locator("#d3entropyParent").waitFor({ state: "attached" })
+      const { entropyTop, areaBottom } = await page.evaluate(() => ({
+        entropyTop: document.getElementById("d3entropyParent")?.getBoundingClientRect().top,
+        areaBottom: document.querySelector(".auspice-vscode-panels-scroll")?.getBoundingClientRect()
+          .bottom,
+      }))
+      assert.ok(
+        entropyTop !== undefined && areaBottom !== undefined && entropyTop > areaBottom,
+        `the entropy panel starts at ${entropyTop}, the panel area ends at ${areaBottom}`,
+      )
       await zoomIntoClade(page, "AB")
       await page.locator("#d3entropyParent").getByText("data loading").waitFor()
       assert.equal(await page.locator("#d3entropyParent").getByText("data loading").count(), 1)
@@ -285,10 +303,11 @@ const scenarios: readonly Scenario[] = [
       ])
       assert.equal(svgExport?.content.includes('<svg id="entropy"'), true)
       assert.equal(svgExport?.content.includes("data loading"), false)
-      // Oracle: the clade "AB" holds the mutations at bases 10 and 20 (`entropyDataset`), one
-      // change each
+      // Oracle: in the clade "AB", one of the two tips has a mutation at base 10 and the other at
+      // base 20 (`entropyDataset`), so each base has the Shannon entropy ln 2 = 0.693, which is
+      // the diversity measure that Auspice shows by default
       assert.equal(entropyExport?.filename, "view_diversity.tsv")
-      assert.equal(entropyExport?.content, "base\tevents\n10\t1\n20\t1")
+      assert.equal(entropyExport?.content, "base\tentropy\n10\t0.693\n20\t0.693")
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -486,22 +505,25 @@ const scenarios: readonly Scenario[] = [
     { viewport: { width: 900, height: 520 }, secondDataset: undefined },
     { viewport: { width: 900, height: 520 }, secondDataset: shortNameDataset },
   ].map(({ viewport, secondDataset }) => ({
-    name: `fits ${secondDataset === undefined ? "one tree" : "two trees"} into a ${viewport.width}x${viewport.height} panel area below the dataset header`,
+    name: `sizes ${secondDataset === undefined ? "one tree" : "two trees"} by Auspice's panel fractions in a ${viewport.width}x${viewport.height} viewer`,
     async run(): Promise<void> {
       const { page, pageErrors } = await openViewer(branchLabelDataset, { viewport, secondDataset })
       await page.locator("#MainTree .tip").first().waitFor()
-      const gap = await page.evaluate(() => {
-        const area = document.querySelector(".auspice-vscode-panels-scroll")
-        const card = document.getElementById("MainTree")?.closest("[id$=Card]")
-        if (area === null || card === null || card === undefined) return Number.NaN
-        const marginBottom = parseFloat(getComputedStyle(card).marginBottom)
-        return (
-          area.getBoundingClientRect().bottom - card.getBoundingClientRect().bottom - marginBottom
-        )
-      })
-      // Oracle: the tree card ends at the bottom of the panel area, above the 2 px line gap below
-      // the inline-block card
-      assert.ok(gap >= 0 && gap <= 3, `gap below the tree card is ${gap} px`)
+      const { areaHeight, treeHeight, layout } = await page.evaluate(() => ({
+        areaHeight: document.querySelector(".auspice-vscode-panels-scroll")?.clientHeight ?? 0,
+        treeHeight: Number(
+          document.getElementById("MainTree")?.closest("svg")?.getAttribute("height"),
+        ),
+        layout: document.querySelector<HTMLElement>(".auspice-vscode-tree-header")?.dataset[
+          "layout"
+        ],
+      }))
+      // Oracle: Auspice's `calcPanelDims()` gives a full panel 0.88 of the panel area height minus
+      // 52 px; the tree drawing leaves out the title row of the card (26 px, 46 px with two trees)
+      // and the header row when it takes its own row (26 px)
+      const titleRow = secondDataset === undefined ? 26 : 46
+      const headerRow = layout === "stacked" ? 26 : 0
+      assert.equal(treeHeight, 0.88 * areaHeight - 52 - titleRow - headerRow)
       assert.deepEqual(pageErrors, [])
     },
   })),
@@ -542,35 +564,123 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
-    name: "keeps the tree buttons clear of the tree card title in a narrow panel area",
+    name: "shows the summary, a filter, the downloads and the zoom buttons in one title row",
     async run() {
-      // With the sidebar open, a 700 px viewer leaves the tree card too narrow for its buttons in
-      // one row
+      const { page, pageErrors } = await openViewer(contractDataset)
+      await page.locator("#MainTree .tip").first().waitFor()
+      const filter = page.getByRole("combobox", { name: "Filter Data" })
+      await filter.fill("Switzerland")
+      await page
+        .getByRole("option", { name: /Switzerland/u })
+        .first()
+        .click()
+      await page.getByRole("button", { name: "Remove filter Switzerland" }).waitFor()
+      assert.equal(await headerLayout(page), "overlay")
+      const row = await titleRowBoxes(page)
+      // Oracle: the parts sit in the 26 px title row of the tree card, from left to right
+      const parts = [row.summary, row.badge, ...row.downloads, ...row.zoomButtons]
+      for (const part of parts) {
+        assert.ok(
+          part !== undefined && part.top >= row.card.top && part.bottom <= row.card.top + 26,
+          `a part of the title row lies at ${JSON.stringify(part)}, the card at ${JSON.stringify(row.card)}`,
+        )
+      }
+      assert.ok(row.badge !== undefined && row.summary !== undefined)
+      assert.ok(row.badge.right <= row.summary.right, "the filter badge is cut off")
+      assert.deepEqual(
+        overlappingNeighbors([row.summary, ...row.downloads, ...row.zoomButtons]),
+        [],
+      )
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "puts the title row above the tree card where the card is narrow",
+    async run() {
+      // With the sidebar open, a 700 px viewer leaves the tree card too narrow for the downloads
+      // and the summary beside the zoom buttons
       const { page, pageErrors } = await openViewer(tipLabelDataset, {
         viewport: { width: 700, height: 520 },
       })
       await page.locator("#MainTree .tip").first().waitFor()
-      const overlaps = await page.evaluate(() => {
-        const card = document.getElementById("MainTree")?.closest("[id$=Card]")
-        const title = card?.querySelector("#CardTitle")
-        if (title === null || title === undefined) return ["(no card title)"]
-        const range = document.createRange()
-        range.selectNodeContents(title)
-        const text = range.getBoundingClientRect()
-        return [...(card?.querySelectorAll("button") ?? [])]
-          .filter((button) => {
-            const box = button.getBoundingClientRect()
-            return (
-              box.width > 0 &&
-              box.left < text.right &&
-              box.right > text.left &&
-              box.top < text.bottom &&
-              box.bottom > text.top
-            )
-          })
-          .map((button) => button.textContent ?? "")
+      assert.equal(await headerLayout(page), "stacked")
+      const row = await titleRowBoxes(page)
+      assert.ok(row.header !== undefined && row.header.bottom <= row.card.top)
+      // Oracle: the downloads end where the zoom buttons below them end
+      const lastDownload = row.downloads.at(-1)
+      const lastZoomButton = row.zoomButtons.at(-1)
+      assert.ok(lastDownload !== undefined && lastZoomButton !== undefined)
+      assert.ok(Math.abs(lastDownload.right - lastZoomButton.right) < 1)
+      assert.deepEqual(overlappingNeighbors([row.summary, ...row.downloads]), [])
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "keeps the names of two trees clear of the title row and of the topmost tips",
+    async run() {
+      const { page, pageErrors } = await openViewer(tipLabelDataset, {
+        secondDataset: shortNameDataset,
       })
-      assert.deepEqual(overlaps, [])
+      await page.locator("#SecondTree .tip").first().waitFor()
+      await page.locator("#SecondTreeTitle").waitFor()
+      assert.equal(await headerLayout(page), "stacked")
+      const boxes = await page.evaluate(() => {
+        const box = (element: Element | null | undefined): Box | undefined => {
+          const rect = element?.getBoundingClientRect()
+          return rect && { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+        }
+        const topmostTip = (treeId: string): number =>
+          Math.min(
+            ...[...document.querySelectorAll(`#${treeId} .tip`)].map(
+              (tip) => tip.getBoundingClientRect().top,
+            ),
+          )
+        return {
+          header: box(document.querySelector(".auspice-vscode-tree-header")),
+          names: [
+            box(document.getElementById("MainTreeTitle")),
+            box(document.getElementById("SecondTreeTitle")),
+          ],
+          topmostTip: Math.min(topmostTip("MainTree"), topmostTip("SecondTree")),
+        }
+      })
+      for (const name of boxes.names) {
+        assert.ok(
+          name !== undefined &&
+            boxes.header !== undefined &&
+            name.top >= boxes.header.bottom &&
+            name.bottom <= boxes.topmostTip,
+          `a tree name lies at ${JSON.stringify(name)}, the row ends at ${boxes.header?.bottom}, the tips start at ${boxes.topmostTip}`,
+        )
+      }
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "shows the tree and the map side by side in a wide viewer",
+    async run() {
+      // Auspice starts with the grid layout in a window wider than 1600 px
+      const { page, pageErrors } = await openViewer(contractDataset, {
+        viewport: { width: 1_700, height: 900 },
+        panels: "dataset",
+        maps: true,
+      })
+      await page.locator(".leaflet-container canvas").first().waitFor()
+      await page.getByRole("button", { name: "grid" }).waitFor()
+      const { tree, map } = await page.evaluate(() => {
+        const box = (element: Element | null | undefined): Box | undefined => {
+          const rect = element?.getBoundingClientRect()
+          return rect && { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+        }
+        return {
+          tree: box(document.getElementById("MainTree")?.closest("svg")),
+          map: box(document.querySelector(".leaflet-container")),
+        }
+      })
+      assert.ok(
+        tree !== undefined && map !== undefined && map.left >= tree.right && map.top < tree.bottom,
+        `the tree lies at ${JSON.stringify(tree)}, the map at ${JSON.stringify(map)}`,
+      )
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -770,6 +880,23 @@ interface ViewerOptions {
   readonly panels?: "tree" | "dataset"
 }
 
+/** A box on the page, as `DOMRect.toJSON()` gives it */
+interface Box {
+  readonly left: number
+  readonly right: number
+  readonly top: number
+  readonly bottom: number
+}
+
+interface TitleRowBoxes {
+  readonly card: Box
+  readonly header: Box | undefined
+  readonly summary: Box | undefined
+  readonly badge: Box | undefined
+  readonly downloads: readonly Box[]
+  readonly zoomButtons: readonly Box[]
+}
+
 interface ViewerFile {
   readonly name: string
   readonly text: string
@@ -937,6 +1064,70 @@ async function zoomIntoClade(page: Page, name: string): Promise<void> {
     if (branch instanceof SVGElement) branch.dataset["testid"] = "zoom-branch"
   }, name)
   await page.getByTestId("zoom-branch").click()
+}
+
+/** Return the layout of the header row of the tree card: "overlay" or "stacked" */
+function headerLayout(page: Page): Promise<string | undefined> {
+  return page.evaluate(
+    () => document.querySelector<HTMLElement>(".auspice-vscode-tree-header")?.dataset["layout"],
+  )
+}
+
+/** Return the boxes of the tree card, its header row, and the parts of the row and the title row */
+function titleRowBoxes(page: Page): Promise<TitleRowBoxes> {
+  return page.evaluate(() => {
+    const box = (rect: DOMRect | undefined): Box | undefined =>
+      rect && { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+    const boxes = (elements: Iterable<Element>): Box[] =>
+      [...elements].flatMap((element) => box(element.getBoundingClientRect()) ?? [])
+    const card = document.getElementById("MainTree")?.closest("[id$=Card]")
+    const summary = document.querySelector(".auspice-vscode-tree-summary")
+    // The text of the summary, which ends before the free space of its box. The badge tooltips
+    // wait off screen.
+    const range = document.createRange()
+    if (summary !== null) range.selectNodeContents(summary)
+    const summaryBox = summary?.getBoundingClientRect()
+    const textBoxes = [...range.getClientRects()].filter(
+      (rect) =>
+        summaryBox !== undefined &&
+        rect.width > 0 &&
+        rect.left >= summaryBox.left - 1 &&
+        rect.top >= summaryBox.top - 1 &&
+        rect.bottom <= summaryBox.bottom + 1,
+    )
+    const textBox =
+      textBoxes.length === 0
+        ? undefined
+        : {
+            left: Math.min(...textBoxes.map((rect) => rect.left)),
+            right: Math.max(...textBoxes.map((rect) => rect.right)),
+            top: Math.min(...textBoxes.map((rect) => rect.top)),
+            bottom: Math.max(...textBoxes.map((rect) => rect.bottom)),
+          }
+    const badge = document.querySelector(
+      '.auspice-vscode-tree-summary [aria-label^="Remove filter"]',
+    )?.parentElement
+    return {
+      card: box(card?.getBoundingClientRect()) ?? { left: 0, right: 0, top: 0, bottom: 0 },
+      header: box(document.querySelector(".auspice-vscode-tree-header")?.getBoundingClientRect()),
+      summary: textBox,
+      badge: box(badge?.getBoundingClientRect()),
+      downloads: boxes(document.querySelectorAll(".auspice-vscode-tree-download")),
+      zoomButtons: boxes(
+        card?.querySelectorAll("#CardContentContainer > div:last-child > button") ?? [],
+      ),
+    }
+  })
+}
+
+/** Return the pairs of neighbors, from left to right, that overlap */
+function overlappingNeighbors(boxes: readonly (Box | undefined)[]): string[] {
+  return boxes.slice(1).flatMap((next, index) => {
+    const previous = boxes[index]
+    return previous === undefined || next === undefined || previous.right <= next.left
+      ? []
+      : [`${JSON.stringify(previous)} overlaps ${JSON.stringify(next)}`]
+  })
 }
 
 /** Wait until the page has rendered two more frames, so that the updates of an input show */

@@ -1,11 +1,8 @@
-import { TreeDownloadButtons } from "./TreeDownloadButtons"
-
 // Auspice resolves customisations through `getExtension`/`hasExtension`
 // (`@auspice/util/extensions`). Its stock implementation reads a build-time
 // `EXTENSION_DATA` env var and loads components through webpack's
 // `require.context`, which Bun cannot bundle, so the patch to `extensions.ts`
-// imports this already-resolved registry instead. Values for `*Component` keys
-// are components, not module names.
+// imports this already-resolved registry instead.
 //
 // The sidebar theme is the light theme of nextstrain.org and Nextclade, which
 // matches the white panels next to it; Auspice's default sidebar is dark.
@@ -26,7 +23,6 @@ const registry: Record<string, unknown> = {
     unselectedColor: "#333",
     alternateBackground: "#888",
   },
-  treeButtonsComponent: TreeDownloadButtons,
   filePrefix: "view",
   downloadModal: false,
   entryPage: "splash",

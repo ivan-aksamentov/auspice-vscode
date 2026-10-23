@@ -318,21 +318,132 @@
 }
 
 /*
- * Auspice sizes the dataset title of the info header for a browser window (24-28 px). In an editor
- * tab, 18-22 px keeps the title above the byline in the hierarchy and leaves more height to the
- * tree. The title is the first of the header lines, which Auspice marks with a `width` attribute.
+ * The dataset header (`DatasetHeader`), in the fonts and colors of Auspice's info card, aligned
+ * with the content of the cards below it (14 px card margin and 6 px card padding). Auspice sizes
+ * the title for a browser window (24-28 px). In an editor tab, 18-22 px keeps the title above the
+ * byline in the hierarchy and leaves more height to the tree.
  */
-.auspice-vscode-panel-header #CardContentContainer > div > :nth-child(1 of [width]) {
-  font-size: clamp(18px, 1vw + 12px, 22px) !important;
+.auspice-vscode-dataset-header {
+  color: #333;
+  font-family: Lato, "Helvetica Neue", Helvetica, sans-serif;
+  padding: 8px 20px 10px;
+}
+
+/* Auspice's edit button floats right and takes its size from this font */
+.auspice-vscode-dataset-title-row {
+  display: flow-root;
+  font-size: clamp(18px, 1vw + 12px, 22px);
+}
+
+.auspice-vscode-dataset-title {
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  margin: 0 0 5px;
+}
+
+.auspice-vscode-dataset-byline {
+  color: #555;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 5px 0 5px 2px;
 }
 
 /*
- * The download buttons and Auspice's zoom buttons hang from the top of the tree card. A narrow
- * card needs more than one row for them: wrap them towards the right, clear of the card title.
+ * The tree panel (`TreePanel`): the header row and Auspice's tree card. The title row of the card
+ * has a fixed height, which the size of the tree drawing leaves out: 26 px, or 46 px with two
+ * trees, whose names Auspice writes 25 px below the top of the card. Auspice styles the title row
+ * inline, so these rules need `!important`.
  */
-.auspice-vscode-panels-scroll div:has(> .auspice-vscode-tree-download) {
+.auspice-vscode-tree-panel {
+  display: inline-block;
+  position: relative;
+}
+
+/*
+ * Auspice's cards are inline blocks, so that grid panels (e.g. the tree and the map) share a row.
+ * Each card starts at the top of its row.
+ */
+.auspice-vscode-panels-scroll > * {
+  vertical-align: top;
+}
+
+.auspice-vscode-tree-panel > :last-child > #CardTitle {
+  box-sizing: border-box;
+  height: 26px;
+  line-height: 25px;
+  margin: 0 !important;
+  min-height: 0 !important;
+}
+
+.auspice-vscode-tree-panel[data-trees="two"] > :last-child > #CardTitle {
+  height: 46px;
+}
+
+/* The header row replaces the title text */
+.auspice-vscode-tree-panel:not([data-header="none"]) > :last-child > #CardTitle {
+  font-size: 0 !important;
+}
+
+/*
+ * The header row lies over the title row of the card, between the start of the title and the zoom
+ * buttons, or takes its own row above the card, ending where the zoom buttons end
+ */
+.auspice-vscode-tree-header {
+  align-items: center;
+  box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: calc(100% - 100px);
+  gap: 16px;
+  height: 26px;
+}
+
+.auspice-vscode-tree-header[data-layout="overlay"] {
+  left: var(--auspice-vscode-header-left, 20px);
+  position: absolute;
+  right: var(--auspice-vscode-header-right, 0);
+  top: 0;
+  z-index: 1;
+}
+
+/* The summary in a row of its own never widens the panel beyond the card */
+.auspice-vscode-tree-header[data-layout="stacked"] {
+  contain: inline-size;
+  padding-left: var(--auspice-vscode-header-left, 20px);
+  padding-right: var(--auspice-vscode-header-right, 0);
+}
+
+/*
+ * The summary and the active filters in one line, in the style of Auspice's info card. Auspice
+ * draws the set notation symbols of the filters large, and starts the measurement filters on a
+ * new line, which would make the line taller.
+ */
+.auspice-vscode-tree-summary {
+  color: #888;
+  flex: 1 1 0;
+  font-family: Lato, "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auspice-vscode-tree-summary span {
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+.auspice-vscode-tree-summary br {
+  display: none;
+}
+
+/* The download buttons hang from the top of the title row, as the zoom buttons next to them */
+.auspice-vscode-tree-actions {
+  align-self: flex-start;
+  display: flex;
+  flex: 0 0 auto;
 }

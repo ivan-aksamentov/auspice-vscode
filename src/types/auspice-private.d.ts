@@ -41,11 +41,53 @@ declare module "@auspice/components/narrative/renderNarrativeToggle" {
   ): ReactElement
 }
 
-declare module "@auspice/components/info/info" {
+declare module "@auspice/components/info/byline" {
   import type { ComponentType } from "react"
 
-  const Info: ComponentType<{ readonly width: number }>
-  export default Info
+  const Byline: ComponentType
+  export default Byline
+}
+
+declare module "@auspice/components/info/warning" {
+  import type { ComponentType } from "react"
+
+  const Warning: ComponentType
+  export default Warning
+}
+
+declare module "@auspice/components/info/filtersSummary" {
+  import type { ComponentType } from "react"
+
+  /** The active filters as badges, which remove their filter when clicked */
+  const FiltersSummary: ComponentType
+  export default FiltersSummary
+}
+
+declare module "@auspice/components/datasetEditor/datasetEditor" {
+  /** Return whether the `enableDatasetEditor` extension turns the dataset editor on */
+  export function enableDatasetEditor(): boolean
+}
+
+declare module "@auspice/components/datasetEditor/editButton" {
+  import type { ComponentType } from "react"
+
+  const EditButton: ComponentType
+  export default EditButton
+}
+
+declare module "@auspice/components/datasetEditor/editedBanner" {
+  import type { ComponentType } from "react"
+
+  const EditedBanner: ComponentType
+  export default EditedBanner
+}
+
+declare module "@auspice/globalStyles" {
+  import type { CSSProperties } from "react"
+
+  export const darkGrey: string
+  /** Style of Auspice's tab buttons, such as the zoom buttons of the tree */
+  export const tabSingle: CSSProperties
 }
 
 declare module "@auspice/components/framework/footer" {
