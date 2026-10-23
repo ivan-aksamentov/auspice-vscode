@@ -1001,6 +1001,46 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "keeps the labels and the legend of the SVG export inside the figure at a viewer scale of 0.8",
+    async run() {
+      const { page, pageErrors } = await openViewer({
+        ...contractDataset,
+        meta: { ...contractDataset.meta, panels: ["tree"] },
+        tree: tipLabelDataset.tree,
+      })
+      await page.locator("#MainTree .tip").first().waitFor()
+      await page.evaluate(() => {
+        window.postMessage({ type: "setScale", scale: 0.8 }, "*")
+      })
+      await page.waitForFunction(
+        () =>
+          document.getElementById("root")?.style.getPropertyValue("--auspice-viewer-scale") ===
+          "0.8",
+      )
+      const legend = page.locator('[id="LegendContainer"]').first()
+      await legend.waitFor()
+      assert.deepEqual(await treeLabelsOutsideSvgExport(page), [])
+      assert.deepEqual(await legendTextsOutsideSvgExport(page), [])
+      // Oracle: the export draws the panels at their layout size, which the CSS scale of the
+      // viewer does not change, so the legend keeps its layout size too. The export writes
+      // positions to 0.01 px.
+      const layoutSize = await legend.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return [style.width, style.height].map((size) => Number(parseFloat(size).toFixed(2)))
+      })
+      const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+      const legendTag =
+        /<svg id="treeLegend" width="(?<width>[^"]+)" height="(?<height>[^"]+)"/u.exec(
+          svgExport?.content ?? "",
+        )
+      const exportedSize = [legendTag?.groups?.["width"], legendTag?.groups?.["height"]].map(
+        (size) => Number(Number(size).toFixed(2)),
+      )
+      assert.deepEqual(exportedSize, layoutSize)
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
     name: "hides the map and reports why when the window has no WebGL",
     async run() {
       const { page, pageErrors } = await openViewer(contractDataset, {
@@ -1334,6 +1374,36 @@ async function treeLabelsOutsideSvgExport(page: Page): Promise<string[]> {
         )
       })
       .map((label) => label.textContent ?? "")
+    image.remove()
+    return outside
+  }, svgExport?.content ?? "")
+}
+
+/**
+ * Export the SVG screenshot and return the legend texts that lie outside their legend in it, e.g.
+ * where the legend was measured at another scale than the panels
+ */
+async function legendTextsOutsideSvgExport(page: Page): Promise<string[]> {
+  const [svgExport] = await downloadsFromTreeButtons(page, ["SVG"])
+  return page.evaluate((content) => {
+    const exported = new DOMParser().parseFromString(content, "image/svg+xml")
+    const image = document.importNode(exported.documentElement, true)
+    document.body.append(image)
+    const outside = [...image.querySelectorAll('svg[id$="Legend"]')].flatMap((legend) => {
+      const bounds = legend.getBoundingClientRect()
+      return [...legend.querySelectorAll("text")]
+        .filter((text) => {
+          const rect = text.getBoundingClientRect()
+          return (
+            rect.width > 0 &&
+            (rect.left < bounds.left - 0.5 ||
+              rect.right > bounds.right + 0.5 ||
+              rect.top < bounds.top - 0.5 ||
+              rect.bottom > bounds.bottom + 0.5)
+          )
+        })
+        .map((text) => text.textContent ?? "")
+    })
     image.remove()
     return outside
   }, svgExport?.content ?? "")

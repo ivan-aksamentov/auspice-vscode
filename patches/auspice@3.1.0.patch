@@ -400,6 +400,195 @@ index a73fe7bf478e18e97a194de0243718e9d2cb53bf..a969f919f0f2ecbfa74727f33351733d
          <Slider disabled={disabled}/>
          {label === "" ? null : (
            <ToggleSubtitle>
+diff --git a/src/components/download/domToSvg.js b/src/components/download/domToSvg.js
+index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da3495c570cd 100644
+--- a/src/components/download/domToSvg.js
++++ b/src/components/download/domToSvg.js
+@@ -26,6 +26,15 @@ const LOG = "[SVG export]";
+ /** round to 2dp to keep the output readable */
+ const r2 = (n) => Math.round(n * 100) / 100;
+ 
++/** Return the box of a client rect in the layout pixels of the exported block (see `htmlToSvg`), relative to its
++top-left */
++const inFrame = (rect, frame) => ({
++  x: (rect.left - frame.left) / frame.scale,
++  y: (rect.top - frame.top) / frame.scale,
++  width: rect.width / frame.scale,
++  height: rect.height / frame.scale,
++});
++
+ /** escape a string for use as XML text / attribute content */
+ const esc = (s) => String(s)
+   .replace(/&/g, "&amp;")
+@@ -52,9 +61,9 @@ function parseColor(value) {
+ 
+ /**
+  * Emit a `<rect>` for the element's background &/or border, if any.
+- * Coordinates are relative to `rootRect` (the top-left of the exported block).
++ * Coordinates are relative to `frame` (the top-left of the exported block).
+  */
+-function emitBox(rect, cs, rootRect, out) {
++function emitBox(rect, cs, frame, out) {
+   const attrs = [];
+ 
+   const bg = parseColor(cs.backgroundColor);
+@@ -91,9 +100,10 @@ function emitBox(rect, cs, rootRect, out) {
+   const radius = parseFloat(cs.borderTopLeftRadius) || 0;
+   const radiusAttr = radius > 0 ? ` rx="${r2(radius)}"` : "";
+ 
++  const box = inFrame(rect, frame);
+   out.push(
+-    `<rect x="${r2(rect.left - rootRect.left)}" y="${r2(rect.top - rootRect.top)}" ` +
+-    `width="${r2(rect.width)}" height="${r2(rect.height)}"${radiusAttr} ${attrs.join(" ")} />`
++    `<rect x="${r2(box.x)}" y="${r2(box.y)}" ` +
++    `width="${r2(box.width)}" height="${r2(box.height)}"${radiusAttr} ${attrs.join(" ")} />`
+   );
+ }
+ 
+@@ -145,7 +155,7 @@ function measureTextLines(textNode) {
+ }
+ 
+ /** Emit `<text>` for a text node, one per visual line, using the parent element's font. */
+-function emitText(textNode, parentCs, rootRect, out) {
++function emitText(textNode, parentCs, frame, out) {
+   if (!textNode.nodeValue || !textNode.nodeValue.trim()) return;
+ 
+   const fill = parseColor(parentCs.color) || {color: "#000", opacity: 1};
+@@ -167,8 +177,9 @@ function emitText(textNode, parentCs, rootRect, out) {
+ 
+   for (const line of measureTextLines(textNode)) {
+     if (!line.rect || !line.text.trim()) continue;
+-    const x = r2(line.rect.left - rootRect.left);
+-    const y = r2(line.rect.top - rootRect.top + ascent);
++    const box = inFrame(line.rect, frame);
++    const x = r2(box.x);
++    const y = r2(box.y + ascent);
+     let el = `<text x="${x}" y="${y}" ${fontAttrs}>${esc(line.text)}</text>`;
+     if (href) el = `<a xlink:href="${esc(href)}">${el}</a>`;
+     out.push(el);
+@@ -206,7 +217,7 @@ function makeColorsEditorSafe(root) {
+ }
+ 
+ /** Inline a nested <svg> as-is (it's already vector), positioned at its on-screen spot. */
+-function emitNestedSvg(el, rect, rootRect, out) {
++function emitNestedSvg(el, rect, frame, out) {
+   const clone = el.cloneNode(true);
+   /* Browsers accept rgba() colours in SVG attributes; vector editors don't, so normalise them
+      on the clone (e.g. the legend's translucent white background, else drawn black in Inkscape). */
+@@ -218,10 +229,11 @@ function emitNestedSvg(el, rect, rootRect, out) {
+      strip the element's own transform; its descendants keep their transforms. */
+   if (clone.style) clone.style.transform = "";
+   clone.removeAttribute("transform");
+-  clone.setAttribute("x", r2(rect.left - rootRect.left));
+-  clone.setAttribute("y", r2(rect.top - rootRect.top));
+-  if (!clone.getAttribute("width")) clone.setAttribute("width", r2(rect.width));
+-  if (!clone.getAttribute("height")) clone.setAttribute("height", r2(rect.height));
++  const box = inFrame(rect, frame);
++  clone.setAttribute("x", r2(box.x));
++  clone.setAttribute("y", r2(box.y));
++  if (!clone.getAttribute("width")) clone.setAttribute("width", r2(box.width));
++  if (!clone.getAttribute("height")) clone.setAttribute("height", r2(box.height));
+   out.push(new XMLSerializer().serializeToString(clone));
+ }
+ 
+@@ -232,7 +244,7 @@ function emitNestedSvg(el, rect, rootRect, out) {
+  * with `preserveDrawingBuffer: true`; without that, `toDataURL()` returns a blank image (it does
+  * not throw), which we can't reliably detect, so enabling that flag is the caller's job.
+  */
+-function emitCanvas(el, rect, rootRect, out) {
++function emitCanvas(el, rect, frame, out) {
+   let dataUrl;
+   try {
+     dataUrl = el.toDataURL("image/png");
+@@ -245,14 +257,15 @@ function emitCanvas(el, rect, rootRect, out) {
+     return;
+   }
+   console.warn(`${LOG} <canvas> rasterised to a PNG <image> (${el.width}×${el.height}px); this region of the export is raster, not vector`);
++  const box = inFrame(rect, frame);
+   out.push(
+-    `<image x="${r2(rect.left - rootRect.left)}" y="${r2(rect.top - rootRect.top)}" ` +
+-    `width="${r2(rect.width)}" height="${r2(rect.height)}" xlink:href="${dataUrl}" />`
++    `<image x="${r2(box.x)}" y="${r2(box.y)}" ` +
++    `width="${r2(box.width)}" height="${r2(box.height)}" xlink:href="${dataUrl}" />`
+   );
+ }
+ 
+ /** Emit an `<img>` as an SVG `<image>`. Only embedded (data:) sources are self-contained. */
+-function emitImage(el, rect, rootRect, out) {
++function emitImage(el, rect, frame, out) {
+   const src = el.currentSrc || el.src;
+   if (!src) {
+     console.warn(`${LOG} <img> has no resolvable src; skipping`);
+@@ -261,14 +274,15 @@ function emitImage(el, rect, rootRect, out) {
+   if (!src.startsWith("data:")) {
+     console.warn(`${LOG} <img src="${src.slice(0, 60)}..."> is a remote URL; the exported SVG will reference it rather than embed it`);
+   }
++  const box = inFrame(rect, frame);
+   out.push(
+-    `<image x="${r2(rect.left - rootRect.left)}" y="${r2(rect.top - rootRect.top)}" ` +
+-    `width="${r2(rect.width)}" height="${r2(rect.height)}" xlink:href="${esc(src)}" />`
++    `<image x="${r2(box.x)}" y="${r2(box.y)}" ` +
++    `width="${r2(box.width)}" height="${r2(box.height)}" xlink:href="${esc(src)}" />`
+   );
+ }
+ 
+ /** Recursively transcribe `el` and its descendants into `out` (document/paint order). */
+-function walk(el, rootRect, out, skip) {
++function walk(el, frame, out, skip) {
+   if (skip && skip(el)) return;
+ 
+   const cs = window.getComputedStyle(el);
+@@ -280,19 +294,19 @@ function walk(el, rootRect, out, skip) {
+   const tag = el.tagName.toLowerCase();
+ 
+   if (tag === "svg") {
+-    if (!hidden) emitNestedSvg(el, rect, rootRect, out);
++    if (!hidden) emitNestedSvg(el, rect, frame, out);
+     return; /* don't descend into SVG — we inlined it whole */
+   }
+   if (tag === "img") {
+-    if (!hidden) emitImage(el, rect, rootRect, out);
++    if (!hidden) emitImage(el, rect, frame, out);
+     return;
+   }
+   if (tag === "canvas") {
+-    if (!hidden) emitCanvas(el, rect, rootRect, out);
++    if (!hidden) emitCanvas(el, rect, frame, out);
+     return;
+   }
+ 
+-  if (!hidden) emitBox(rect, cs, rootRect, out);
++  if (!hidden) emitBox(rect, cs, frame, out);
+ 
+   if (cs.overflowY === "auto" || cs.overflowY === "scroll") {
+     if (el.scrollHeight > el.clientHeight + 1) {
+@@ -302,9 +316,9 @@ function walk(el, rootRect, out, skip) {
+ 
+   for (const child of el.childNodes) {
+     if (child.nodeType === Node.TEXT_NODE) {
+-      if (!hidden) emitText(child, cs, rootRect, out);
++      if (!hidden) emitText(child, cs, frame, out);
+     } else if (child.nodeType === Node.ELEMENT_NODE) {
+-      walk(child, rootRect, out, skip);
++      walk(child, frame, out, skip);
+     }
+   }
+ }
+@@ -329,7 +343,12 @@ export function htmlToSvg(root, {skip} = {}) {
+   if (!rootRect.width || !rootRect.height) {
+     console.warn(`${LOG} root element has zero size (${r2(rootRect.width)}×${r2(rootRect.height)}); it may be hidden, so the output will be empty`, root);
+   }
++  /* Client rects include the CSS transforms of the ancestors (e.g. a viewer scaled against the zoom of its window),
++  while the font sizes, borders and SVG sizes that the export writes are layout sizes. Write the positions in the layout
++  pixels of the block too, by the scale at which it is drawn */
++  const scale = root.offsetWidth > 0 && rootRect.width > 0 ? rootRect.width / root.offsetWidth : 1;
++  const frame = {left: rootRect.left, top: rootRect.top, scale};
+   const out = [];
+-  walk(root, rootRect, out, skip);
+-  return {width: rootRect.width, height: rootRect.height, markup: out.join("\n")};
++  walk(root, frame, out, skip);
++  return {width: rootRect.width / scale, height: rootRect.height / scale, markup: out.join("\n")};
+ }
 diff --git a/src/components/download/downloadButtons.js b/src/components/download/downloadButtons.js
 index 89eab1789cd26ee823669ce758788ba9ad35f53b..65b435b166e063053a2b4a10127d389b1e3d1f55 100644
 --- a/src/components/download/downloadButtons.js
@@ -422,7 +611,7 @@ index 89eab1789cd26ee823669ce758788ba9ad35f53b..65b435b166e063053a2b4a10127d389b
      window.location.pathname
          .replace(/^\//, '')       // Remove leading slashes
 diff --git a/src/components/download/helperFunctions.js b/src/components/download/helperFunctions.js
-index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef6ea91d8f 100644
+index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..03593d62a7966f31926d3909777a5bb577bcaa11 100644
 --- a/src/components/download/helperFunctions.js
 +++ b/src/components/download/helperFunctions.js
 @@ -12,6 +12,8 @@ import { createDatasetJson } from "../../util/constructDatasetJson";
@@ -454,7 +643,7 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
  };
  
  export const areAuthorsPresent = (tree) => {
-@@ -464,6 +459,61 @@ const svgElementToPanel = (el) => {
+@@ -464,6 +459,63 @@ const svgElementToPanel = (el) => {
    return {x: 0, y: 0, width, height, inner};
  };
  
@@ -467,6 +656,8 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
 +  const origin = treeGroup.ownerSVGElement.getBoundingClientRect();
 +  const width = parseFloat(treeGroup.getAttribute("width"));
 +  const height = parseFloat(treeGroup.getAttribute("height"));
++  /* client rects include the CSS transforms of the ancestors (e.g. a scaled viewer), the panel size does not */
++  const scale = origin.width / parseFloat(treeGroup.ownerSVGElement.getAttribute("width")) || 1;
 +  const copy = treeGroup.cloneNode(true);
 +  const copiedLabels = copy.querySelectorAll("text");
 +  const labelBox = {left: 0, top: 0, right: width, bottom: height};
@@ -474,10 +665,10 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
 +    const style = window.getComputedStyle(label);
 +    const rect = label.getBoundingClientRect();
 +    if (!label.textContent.trim() || !rect.width || style.visibility === "hidden") return;
-+    const left = rect.left - origin.left;
-+    const right = rect.right - origin.left;
-+    const top = rect.top - origin.top;
-+    const bottom = rect.bottom - origin.top;
++    const left = (rect.left - origin.left) / scale;
++    const right = (rect.right - origin.left) / scale;
++    const top = (rect.top - origin.top) / scale;
++    const bottom = (rect.bottom - origin.top) / scale;
 +    const anchor = labelAnchorX(left, right, style.textAnchor);
 +    if (anchor < 0 || anchor > width || bottom < 0 || top > height) {
 +      copiedLabels[i].setAttribute("display", "none");
@@ -516,7 +707,7 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
  /* take the panels (see svgElementToPanel for struct) and calculate the overall size of the SVG
  as well as the offsets (x, y) to position panels appropriately within this */
  const createBoundingDimensionsAndPositionPanels = (panels, panelLayout, numLinesOfText) => {
-@@ -572,8 +622,14 @@ const injectAsSVGStrings = (output, key, data) => {
+@@ -572,8 +624,14 @@ const injectAsSVGStrings = (output, key, data) => {
    beyond the panel — spills out. An explicit clipPath (plus overflow="hidden" as belt-and-braces)
    clips it everywhere. The key is unique per panel, so the clipPath id is too. */
    const clipId = `${key}Clip`;
@@ -533,7 +724,18 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
    output.push(`<g clip-path="url(#${clipId})">`);
    output.push(data.inner);
    output.push("</g>");
-@@ -651,7 +707,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -642,7 +700,9 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+     try {
+       const r = best.getBoundingClientRect();
+       const {width, height, markup} = htmlToSvg(best);
+-      legends.push({panel, offsetX: r.left - o.left, offsetY: r.top - o.top, width, height, inner: markup});
++      /* client rects include the CSS transforms of the ancestors (e.g. a scaled viewer), the panel sizes do not */
++      const scale = best.offsetWidth > 0 && r.width > 0 ? r.width / best.offsetWidth : 1;
++      legends.push({panel, offsetX: (r.left - o.left) / scale, offsetY: (r.top - o.top) / scale, width, height, inner: markup});
+     } catch (e) {
+       errors.push(`${label} legend`);
+       console.error(`${label} legend SVG save error:`, e);
+@@ -651,7 +711,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
  
    if (panelsInDOM.indexOf("tree") !== -1) {
      try {
@@ -542,7 +744,7 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
      } catch (e) {
        panels.tree = undefined;
        errors.push("tree");
-@@ -663,7 +719,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -663,7 +723,7 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
      }
      if (panels.tree && document.getElementById('SecondTree')) {
        try {
@@ -551,7 +753,7 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
          if (document.getElementById('Tangle')) {
            panels.tangle = svgElementToPanel(document.getElementById("Tangle"));
          }
-@@ -747,7 +803,8 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -747,7 +807,8 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
    falls back to the renderer's defaults (commonly a serif face at a too-light weight). The base
    weight 400 matches `html, p, div { font-weight: 400 }` in global.css. Text that sets its own
    font-family / font-weight (legend, footer, via htmlToSvg) overrides these. */
@@ -561,7 +763,7 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
    if (fontDefs) output.push(fontDefs); /* embedded @font-face so viewers render Lato, not a fallback */
    for (const key in panels) {
      if (panels[key]) {
-@@ -786,8 +843,41 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
+@@ -786,8 +847,41 @@ const writeSVGPossiblyIncludingMap = (dispatch, filePrefix, panelsInDOM, panelLa
    }
  };
  
@@ -604,7 +806,7 @@ index 0e8ca5bd1ec93309b3f1a2706dd3b101955b2fb0..3e1c32f0c82ba74b998052d365d2d4ef
    const textStrings = [];
    textStrings.push(metadata.title);
    textStrings.push(`Last updated ${metadata.updated}`);
-@@ -806,17 +896,7 @@ export const SVG = async (dispatch, t, metadata, nodes, visibility, filePrefix,
+@@ -806,17 +900,7 @@ export const SVG = async (dispatch, t, metadata, nodes, visibility, filePrefix,
    publications.forEach((pub) => {
      textStrings.push(`<a href="${pub.href}">${pub.author}, ${pub.title}, ${pub.journal} (${pub.year})</a>`);
    });
