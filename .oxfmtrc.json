@@ -8,5 +8,6 @@
   "sortImports": true,
   "sortTailwindcss": true,
   "sortPackageJson": true,
-  "jsdoc": true
+  "jsdoc": true,
+  "ignorePatterns": ["assets/basemap/**"]
 }

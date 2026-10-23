@@ -34,6 +34,7 @@
     "build": "bun run typecheck && bun run scripts/build.ts",
     "build:extension": "bun build src/extension.ts --target=node --format=esm --external=vscode --outfile=dist/extension.mjs",
     "build:client": "bun run scripts/build-client.ts",
+    "build:basemap": "bun run scripts/build-basemap.ts",
     "check": "bun run fmt:check && bun run lint && bun run typecheck",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check .",
