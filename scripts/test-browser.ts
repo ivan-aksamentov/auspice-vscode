@@ -859,6 +859,10 @@ const scenarios: readonly Scenario[] = [
         /Map: .*Natural Earth.*5\.1\.2/su.test(svgExport?.content ?? ""),
         "the caption does not name the map data",
       )
+      // Oracle: the caption HTML has a space between the link and the version, which is about
+      // 3.5 px wide in its 14 px font; without it, the two texts touch
+      const gap = await textGapInSvgExport(page, svgExport?.content ?? "", "Natural Earth", "5.1.2")
+      assert.ok(gap > 2, `the gap between "Natural Earth" and "5.1.2" is ${gap} px`)
       assert.deepEqual(foreignRequests, [])
       assert.deepEqual(pageErrors, [])
     },
@@ -1436,6 +1440,30 @@ async function mapLegend(page: Page): Promise<void> {
     const card = document.querySelector(".leaflet-container")?.closest('[id$="Card"]')
     return (card?.querySelector('[id="LegendContainer"]') ?? null) !== null
   })
+}
+
+/** Return the horizontal space between two texts of an exported SVG, as a browser draws it */
+function textGapInSvgExport(
+  page: Page,
+  content: string,
+  left: string,
+  right: string,
+): Promise<number> {
+  return page.evaluate(
+    ({ svg, leftText, rightText }) => {
+      const exported = new DOMParser().parseFromString(svg, "image/svg+xml")
+      const image = document.importNode(exported.documentElement, true)
+      document.body.append(image)
+      const box = (text: string): DOMRect | undefined =>
+        [...image.querySelectorAll("text")]
+          .find((element) => element.textContent?.trim() === text)
+          ?.getBoundingClientRect()
+      const gap = (box(rightText)?.left ?? Number.NaN) - (box(leftText)?.right ?? Number.NaN)
+      image.remove()
+      return gap
+    },
+    { svg: content, leftText: left, rightText: right },
+  )
 }
 
 /** Return the positions of the tips of the main tree, once they stay in place for half a second */

@@ -401,7 +401,7 @@ index a73fe7bf478e18e97a194de0243718e9d2cb53bf..a969f919f0f2ecbfa74727f33351733d
          {label === "" ? null : (
            <ToggleSubtitle>
 diff --git a/src/components/download/domToSvg.js b/src/components/download/domToSvg.js
-index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da3495c570cd 100644
+index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..de5bd61d79993398a9e5d2b724fd52d24f68f554 100644
 --- a/src/components/download/domToSvg.js
 +++ b/src/components/download/domToSvg.js
 @@ -26,6 +26,15 @@ const LOG = "[SVG export]";
@@ -445,16 +445,59 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
    );
  }
  
-@@ -145,7 +155,7 @@ function measureTextLines(textNode) {
+@@ -113,7 +123,7 @@ function measureTextLines(textNode) {
+     return [];
+   }
+   if (allRects.length === 1) {
+-    return [{text: str, rect: allRects[0]}];
++    return [lineAt(textNode, 0, str.length)];
+   }
+ 
+   /* multi-line: find the character offsets where the line breaks */
+@@ -129,23 +139,33 @@ function measureTextLines(textNode) {
+     if (prevTop === null) prevTop = last.top;
+     if (last.top > prevTop + 0.5) {
+       /* char (i-1) started a new line; close off the previous one */
+-      range.setStart(textNode, lineStart);
+-      range.setEnd(textNode, i - 1);
+-      const lineRects = range.getClientRects();
+-      lines.push({text: str.slice(lineStart, i - 1), rect: lineRects[lineRects.length - 1]});
++      lines.push(lineAt(textNode, lineStart, i - 1));
+       lineStart = i - 1;
+       prevTop = last.top;
+     }
+   }
+-  range.setStart(textNode, lineStart);
+-  range.setEnd(textNode, str.length);
+-  const lineRects = range.getClientRects();
+-  lines.push({text: str.slice(lineStart), rect: lineRects[lineRects.length - 1]});
++  lines.push(lineAt(textNode, lineStart, str.length));
+   return lines;
  }
  
++/**
++ * Return the line `[start, end)` of a text node from its first visible character, with the client rect of that part.
++ * HTML draws a space at the start of a text node that follows an inline element (e.g. the text after a link), but an
++ * SVG `<text>` drops its leading spaces, so a line that kept its space would start one space too far left.
++ */
++function lineAt(textNode, start, end) {
++  const str = textNode.nodeValue;
++  let first = start;
++  while (first < end && /\s/.test(str[first])) first++;
++  const range = document.createRange();
++  range.setStart(textNode, first);
++  range.setEnd(textNode, end);
++  const rects = range.getClientRects();
++  return {text: str.slice(first, end), rect: rects[rects.length - 1]};
++}
++
  /** Emit `<text>` for a text node, one per visual line, using the parent element's font. */
 -function emitText(textNode, parentCs, rootRect, out) {
 +function emitText(textNode, parentCs, frame, out) {
    if (!textNode.nodeValue || !textNode.nodeValue.trim()) return;
  
    const fill = parseColor(parentCs.color) || {color: "#000", opacity: 1};
-@@ -167,8 +177,9 @@ function emitText(textNode, parentCs, rootRect, out) {
+@@ -167,8 +187,9 @@ function emitText(textNode, parentCs, rootRect, out) {
  
    for (const line of measureTextLines(textNode)) {
      if (!line.rect || !line.text.trim()) continue;
@@ -466,7 +509,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
      let el = `<text x="${x}" y="${y}" ${fontAttrs}>${esc(line.text)}</text>`;
      if (href) el = `<a xlink:href="${esc(href)}">${el}</a>`;
      out.push(el);
-@@ -206,7 +217,7 @@ function makeColorsEditorSafe(root) {
+@@ -206,7 +227,7 @@ function makeColorsEditorSafe(root) {
  }
  
  /** Inline a nested <svg> as-is (it's already vector), positioned at its on-screen spot. */
@@ -475,7 +518,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
    const clone = el.cloneNode(true);
    /* Browsers accept rgba() colours in SVG attributes; vector editors don't, so normalise them
       on the clone (e.g. the legend's translucent white background, else drawn black in Inkscape). */
-@@ -218,10 +229,11 @@ function emitNestedSvg(el, rect, rootRect, out) {
+@@ -218,10 +239,11 @@ function emitNestedSvg(el, rect, rootRect, out) {
       strip the element's own transform; its descendants keep their transforms. */
    if (clone.style) clone.style.transform = "";
    clone.removeAttribute("transform");
@@ -491,7 +534,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
    out.push(new XMLSerializer().serializeToString(clone));
  }
  
-@@ -232,7 +244,7 @@ function emitNestedSvg(el, rect, rootRect, out) {
+@@ -232,7 +254,7 @@ function emitNestedSvg(el, rect, rootRect, out) {
   * with `preserveDrawingBuffer: true`; without that, `toDataURL()` returns a blank image (it does
   * not throw), which we can't reliably detect, so enabling that flag is the caller's job.
   */
@@ -500,7 +543,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
    let dataUrl;
    try {
      dataUrl = el.toDataURL("image/png");
-@@ -245,14 +257,15 @@ function emitCanvas(el, rect, rootRect, out) {
+@@ -245,14 +267,15 @@ function emitCanvas(el, rect, rootRect, out) {
      return;
    }
    console.warn(`${LOG} <canvas> rasterised to a PNG <image> (${el.width}×${el.height}px); this region of the export is raster, not vector`);
@@ -519,7 +562,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
    const src = el.currentSrc || el.src;
    if (!src) {
      console.warn(`${LOG} <img> has no resolvable src; skipping`);
-@@ -261,14 +274,15 @@ function emitImage(el, rect, rootRect, out) {
+@@ -261,14 +284,15 @@ function emitImage(el, rect, rootRect, out) {
    if (!src.startsWith("data:")) {
      console.warn(`${LOG} <img src="${src.slice(0, 60)}..."> is a remote URL; the exported SVG will reference it rather than embed it`);
    }
@@ -538,7 +581,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
    if (skip && skip(el)) return;
  
    const cs = window.getComputedStyle(el);
-@@ -280,19 +294,19 @@ function walk(el, rootRect, out, skip) {
+@@ -280,19 +304,19 @@ function walk(el, rootRect, out, skip) {
    const tag = el.tagName.toLowerCase();
  
    if (tag === "svg") {
@@ -562,7 +605,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
  
    if (cs.overflowY === "auto" || cs.overflowY === "scroll") {
      if (el.scrollHeight > el.clientHeight + 1) {
-@@ -302,9 +316,9 @@ function walk(el, rootRect, out, skip) {
+@@ -302,9 +326,9 @@ function walk(el, rootRect, out, skip) {
  
    for (const child of el.childNodes) {
      if (child.nodeType === Node.TEXT_NODE) {
@@ -574,7 +617,7 @@ index 3db6be39c810a0a9366b1fe6e4a1445da36391e0..403a096e3595ed4ffe422afea135da34
      }
    }
  }
-@@ -329,7 +343,12 @@ export function htmlToSvg(root, {skip} = {}) {
+@@ -329,7 +353,12 @@ export function htmlToSvg(root, {skip} = {}) {
    if (!rootRect.width || !rootRect.height) {
      console.warn(`${LOG} root element has zero size (${r2(rootRect.width)}×${r2(rootRect.height)}); it may be hidden, so the output will be empty`, root);
    }
