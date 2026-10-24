@@ -119,6 +119,10 @@ All settings live under `auspiceVscode.*` and can be set globally or per workspa
 
 VS Code `1.74.0` or newer.
 
+## Changelog
+
+[CHANGELOG.md](CHANGELOG.md) describes the changes of each version. VS Code also shows it on the **Changelog** tab of the extension.
+
 ## Maintenance
 
 <details>
