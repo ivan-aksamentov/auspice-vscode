@@ -48,7 +48,8 @@
     "test:browser": "bun run scripts/test-browser.ts",
     "test:vscode": "bun run scripts/test-vscode.ts",
     "package": "bun run build && vsce package --no-dependencies --out auspice-vscode.vsix",
-    "release": "bun run scripts/release.ts"
+    "release": "bun run scripts/release.ts",
+    "release:notes": "bun run scripts/release-notes.ts"
   },
   "dependencies": {
     "@reduxjs/toolkit": "1.9.7",

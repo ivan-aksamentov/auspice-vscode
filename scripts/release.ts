@@ -1,37 +1,44 @@
 import { resolve } from "node:path"
 
+import { releaseChangelog } from "./changelog.js"
 import { run } from "./process.js"
 
 const BUMPS = ["patch", "minor", "major"] as const
 
 const extensionRoot = resolve(import.meta.dirname, "..")
 const manifestPath = resolve(extensionRoot, "package.json")
+const changelogPath = resolve(extensionRoot, "CHANGELOG.md")
 
 const bump = process.argv[2] ?? "patch"
 if (!isBump(bump)) {
   throw new Error(`Usage: bun run release <${BUMPS.join(" | ")}>`)
 }
 
-if (gitOutput(["status", "--porcelain"]) !== "") {
-  throw new Error("Working tree is dirty. Commit or stash changes before releasing.")
+// The release commit includes the changes to CHANGELOG.md, so they may stay uncommitted
+if (gitOutput(["status", "--porcelain", "--", ".", ":(exclude)CHANGELOG.md"]) !== "") {
+  throw new Error(
+    "Working tree is dirty. Commit or stash changes other than CHANGELOG.md before releasing.",
+  )
 }
 
 const manifest = await readManifest(manifestPath)
 const currentVersion = manifest.version
 const nextVersion = bumpVersion(currentVersion, bump)
 const tag = `v${nextVersion}`
+const changelog = releaseChangelog(await Bun.file(changelogPath).text(), nextVersion)
 
 await Bun.write(
   manifestPath,
   `${JSON.stringify({ ...manifest, version: nextVersion }, undefined, 2)}\n`,
 )
+await Bun.write(changelogPath, changelog)
 
-run("git", ["add", "package.json"], { cwd: extensionRoot })
+run("git", ["add", "package.json", "CHANGELOG.md"], { cwd: extensionRoot })
 run("git", ["commit", "-m", `chore(release): ${tag}`], { cwd: extensionRoot })
 run("git", ["tag", "-a", tag, "-m", tag], { cwd: extensionRoot })
 
 process.stdout.write(
-  `Bumped ${currentVersion} -> ${nextVersion} and tagged ${tag}.\nPush to trigger the release: git push --follow-tags\n`,
+  `Bumped ${currentVersion} -> ${nextVersion}, renamed the Unreleased section of CHANGELOG.md, and tagged ${tag}.\nPush to trigger the release: git push --follow-tags\n`,
 )
 
 async function readManifest(path: string): Promise<Record<string, unknown> & { version: string }> {

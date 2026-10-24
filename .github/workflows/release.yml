@@ -1,7 +1,9 @@
 name: "Release"
 
 # Pushing a version tag builds the extension and, if a VSIX is produced,
-# publishes it to GitHub Releases and the VS Code Marketplace.
+# publishes it to GitHub Releases and the VS Code Marketplace. The notes of
+# the GitHub release are the CHANGELOG.md section of the version, and a tag
+# without one publishes nothing.
 # Cut a release locally with "bun run release <patch|minor|major>", then
 # "git push --follow-tags". No lint, format, or test gates run here.
 on:
@@ -25,6 +27,9 @@ jobs:
       - name: "Install dependencies"
         run: "bun install --frozen-lockfile"
 
+      - name: "Extract release notes from the changelog"
+        run: 'bun run release:notes "${GITHUB_REF_NAME#v}" > release-notes.md'
+
       - name: "Build and package VSIX"
         run: "bun run package"
 
@@ -34,6 +39,7 @@ jobs:
         run: >-
           gh release create "${GITHUB_REF_NAME}" auspice-vscode.vsix
           --title "${GITHUB_REF_NAME}"
+          --notes-file release-notes.md
           --generate-notes
 
       - name: "Publish to VS Code Marketplace"

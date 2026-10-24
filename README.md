@@ -170,8 +170,9 @@ The command creates the stable symlink `~/.vscode/extensions/ivan-aksamentov.aus
 ### Releasing
 
 1. Run `bun run check` and `bun run test`.
-2. `bun run release <patch|minor|major>` -- bumps the version, commits, and tags.
-3. `git push --follow-tags` -- the `v*` tag triggers [release.yml](.github/workflows/release.yml), which builds the VSIX and publishes to [GitHub Releases](https://github.com/ivan-aksamentov/auspice-vscode/releases) and the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ivan-aksamentov.auspice-vscode).
+2. Describe the user-visible changes of the release under `## Unreleased` at the top of [CHANGELOG.md](CHANGELOG.md). The changes may stay uncommitted, because the release commit includes them. `bun run release:notes Unreleased` prints the section, which becomes the notes of the GitHub release. GitHub adds a link to the commits of the release below them.
+3. `bun run release <patch|minor|major>` -- refuses to run without a non-empty `## Unreleased` section, then bumps the version, renames `## Unreleased` to the new version, commits, and tags.
+4. `git push --follow-tags` -- the `v*` tag triggers [release.yml](.github/workflows/release.yml), which builds the VSIX and publishes to [GitHub Releases](https://github.com/ivan-aksamentov/auspice-vscode/releases), with the changelog section of the version as the release notes, and to the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ivan-aksamentov.auspice-vscode), which shows the changelog on the **Changelog** tab of the extension. A tag without a changelog section publishes nothing.
 
 #### VS Code Marketplace setup (one time)
 
