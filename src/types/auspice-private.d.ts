@@ -334,6 +334,20 @@ declare module "@auspice/components/download/helperFunctions" {
     nodes: unknown,
     visibility: unknown,
   ): void
+  /** Return whether a tip of the tree has an author */
+  export function areAuthorsPresent(tree: { readonly nodes: unknown }): boolean
+  /** Write the authors of the visible tips, with their publications (`<filePrefix>_authors.tsv`) */
+  export function authorTSV(dispatch: Dispatch, filePrefix: string, tree: unknown): void
+  /**
+   * Write the accessions, laboratories and authors of the visible tips
+   * (`<filePrefix>_acknowledgements.tsv`)
+   */
+  export function acknowledgmentsTSV(
+    dispatch: Dispatch,
+    filePrefix: string,
+    nodes: unknown,
+    visibility: unknown,
+  ): void
   /** Write the bars of the entropy panel (`<filePrefix>_diversity.tsv`) */
   export function entropyTSV(dispatch: Dispatch, filePrefix: string, entropy: unknown): void
   export function exportTree(options: {

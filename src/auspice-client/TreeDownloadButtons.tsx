@@ -2,7 +2,10 @@ import { getFilePrefix } from "@auspice/components/download/downloadButtons"
 import { publications } from "@auspice/components/download/downloadModal"
 import {
   SVG as writeSvg,
+  acknowledgmentsTSV,
+  areAuthorsPresent,
   auspiceJSON,
+  authorTSV,
   entropyTSV,
   exportTree,
   strainTSV,
@@ -12,7 +15,7 @@ import { darkGrey, tabSingle } from "@auspice/globalStyles"
 import { calcEntropyInView } from "@auspice/util/entropy"
 import { getMapTilesSettings } from "@auspice/util/globals"
 import { version } from "@auspice/version"
-import React, { useCallback } from "react"
+import React, { useCallback, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { useSelector, useStore } from "react-redux"
 import { z } from "zod"
@@ -21,10 +24,11 @@ import { IconDownload } from "./icons"
 import { svgCaption } from "./svgCaption"
 
 // Downloads of the current view: the figure (SVG), the dataset with the view as its display
-// defaults (Auspice JSON), the tree (Newick), the metadata of the shown tips (TSV), and the
-// genetic diversity data (TSV). They replace Auspice's download modal, whose texts describe
-// nextstrain.org data, and offer what the modal offers: each download that the dataset's sharing
-// settings allow (e.g. no dataset and no metadata for GISAID data).
+// defaults (Auspice JSON), the tree (Newick), the metadata, the authors and the acknowledgments of
+// the shown tips (TSV), and the genetic diversity data (TSV). They replace Auspice's download
+// modal, whose texts describe nextstrain.org data. As in the modal, each download shows where the
+// dataset's sharing settings allow it: GISAID data, for example, gets its acknowledgments instead
+// of the dataset and the metadata.
 
 /** The look of Auspice's zoom buttons, which the download buttons stand next to */
 const BUTTON_STYLE: React.CSSProperties = {
@@ -67,6 +71,8 @@ export function TreeDownloadButtons(): React.ReactElement {
   const entropyAvailable = useSelector((state: DownloadState) =>
     state.controls.panelsAvailable.includes("entropy"),
   )
+  const nodes = useSelector((state: DownloadState) => state.tree.nodes)
+  const authorsPresent = useMemo(() => areAuthorsPresent({ nodes }), [nodes])
 
   const downloadSvg = useCallback(async () => {
     const { metadata, tree, controls } = viewStateSchema.parse(store.getState())
@@ -121,6 +127,16 @@ export function TreeDownloadButtons(): React.ReactElement {
     strainTSV(store.dispatch, getFilePrefix(), tree.nodes, tree.visibility)
   }, [store])
 
+  const downloadAuthors = useCallback(() => {
+    const { tree } = viewStateSchema.parse(store.getState())
+    authorTSV(store.dispatch, getFilePrefix(), tree)
+  }, [store])
+
+  const downloadAcknowledgments = useCallback(() => {
+    const { tree } = viewStateSchema.parse(store.getState())
+    acknowledgmentsTSV(store.dispatch, getFilePrefix(), tree.nodes, tree.visibility)
+  }, [store])
+
   const downloadEntropy = useCallback(() => {
     const { entropy, tree } = entropyStateSchema.parse(store.getState())
     // Auspice computes the bars only while the entropy panel is on screen, as the SVG export does
@@ -158,6 +174,20 @@ export function TreeDownloadButtons(): React.ReactElement {
           label="TSV"
           tooltip="Download the metadata of the shown tips (TSV)"
           download={downloadMetadata}
+        />
+      ) : null}
+      {sharing.authors && authorsPresent ? (
+        <DownloadButton
+          label="Authors TSV"
+          tooltip="Download the authors of the shown tips, with their publications (TSV)"
+          download={downloadAuthors}
+        />
+      ) : null}
+      {sharing.gisaid_acknowledgments === true ? (
+        <DownloadButton
+          label="Acknowledgments TSV"
+          tooltip="Download the GISAID accessions, laboratories and authors of the shown tips (TSV)"
+          download={downloadAcknowledgments}
         />
       ) : null}
       {sharing.entropy && entropyAvailable ? (
@@ -205,12 +235,16 @@ interface DownloadState {
     readonly sharing: {
       readonly dataset_json: boolean
       readonly metadata_tsv: boolean
+      readonly authors: boolean
+      /** Set for GISAID data only */
+      readonly gisaid_acknowledgments?: boolean
       readonly trees: boolean
       readonly entropy: boolean
       readonly screenshot: boolean
     }
   }
   readonly controls: { readonly panelsAvailable: readonly string[] }
+  readonly tree: { readonly nodes: unknown }
 }
 
 interface DownloadButtonProps {

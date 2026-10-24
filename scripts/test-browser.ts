@@ -102,6 +102,34 @@ const branchLabelDataset = {
     ],
   },
 }
+// A GISAID dataset whose tips have authors and GISAID accessions
+const gisaidDataset = {
+  version: "v2",
+  meta: { title: "GISAID downloads", panels: ["tree"], data_provenance: [{ name: "GISAID" }] },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: [
+      {
+        name: "A",
+        node_attrs: {
+          div: 1,
+          author: { value: "Smith et al", title: "A study", journal: "A journal" },
+          gisaid_epi_isl: { value: "EPI_ISL_1" },
+          originating_lab: { value: "Originating lab" },
+        },
+      },
+      {
+        name: "B",
+        node_attrs: {
+          div: 1,
+          author: { value: "Smith et al", title: "A study", journal: "A journal" },
+          gisaid_epi_isl: { value: "EPI_ISL_2" },
+        },
+      },
+    ],
+  },
+}
 // A Nextclade output tree: a dated reference tree with a placed sequence ("placed") that has no date
 const partlyDatedDataset = {
   version: "v2",
@@ -318,6 +346,32 @@ const scenarios: readonly Scenario[] = [
       )
       // The export embeds Lato, which it fetches from the font's `data:` URL under the webview CSP
       assert.ok(downloads[0]?.content.includes("@font-face") === true, "the SVG embeds no font")
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "offers the author and acknowledgment downloads of a GISAID dataset",
+    async run() {
+      const { page, pageErrors } = await openViewer(gisaidDataset)
+      await page.locator("#MainTree .tip").first().waitFor()
+      // Oracle: Auspice's sharing rules withhold the dataset and the metadata of GISAID data and
+      // offer its acknowledgments (`computeMetadataSharing()`), and offer the authors where tips
+      // have authors (`areAuthorsPresent()`)
+      const labels = await page.locator(".auspice-vscode-tree-download").allTextContents()
+      assert.deepEqual(labels, ["SVG", "NWK", "Authors TSV", "Acknowledgments TSV"])
+      const [authors, acknowledgments] = await downloadsFromTreeButtons(page, [
+        "Authors TSV",
+        "Acknowledgments TSV",
+      ])
+      assert.equal(authors?.filename, "view_authors.tsv")
+      assert.equal(
+        authors?.content.split("\n")[0],
+        "Author\tn (strains)\tpublication title\tjournal\tpublication URL\tstrains",
+      )
+      assert.ok(authors?.content.includes("Smith et al\t2\tA study\tA journal"))
+      assert.equal(acknowledgments?.filename, "view_acknowledgements.tsv")
+      assert.ok(acknowledgments?.content.includes("EPI_ISL_1"))
+      assert.ok(acknowledgments?.content.includes("Originating lab"))
       assert.deepEqual(pageErrors, [])
     },
   },
