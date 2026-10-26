@@ -130,6 +130,20 @@ const gisaidDataset = {
     ],
   },
 }
+// A dataset whose tip links to its accession, as Nextstrain builds write it
+const ACCESSION_URL = "https://www.ncbi.nlm.nih.gov/nuccore/PX260180"
+const accessionDataset = {
+  version: "v2",
+  meta: { title: "Accession links", panels: ["tree"] },
+  tree: {
+    name: "root",
+    node_attrs: { div: 0 },
+    children: [
+      { name: "A", node_attrs: { div: 1, accession: "PX260180", url: ACCESSION_URL } },
+      { name: "B", node_attrs: { div: 1 } },
+    ],
+  },
+}
 // A Nextclade output tree: a dated reference tree with a placed sequence ("placed") that has no date
 const partlyDatedDataset = {
   version: "v2",
@@ -372,6 +386,35 @@ const scenarios: readonly Scenario[] = [
       assert.equal(acknowledgments?.filename, "view_acknowledgements.tsv")
       assert.ok(acknowledgments?.content.includes("EPI_ISL_1"))
       assert.ok(acknowledgments?.content.includes("Originating lab"))
+      assert.deepEqual(pageErrors, [])
+    },
+  },
+  {
+    name: "lets the window open the links of the tip panel and closes the panel only outside it",
+    async run() {
+      const { page, pageErrors } = await openViewer(accessionDataset)
+      // Oracle: a VS Code webview opens a link from the click that reaches its window, and cancels
+      // the click there (`handleInnerClick()` in VS Code's webview `pre/index.html`)
+      await page.evaluate(() => {
+        window.openedLinks = []
+        window.addEventListener("click", (event) => {
+          const link = event.composedPath().find((target) => target instanceof HTMLAnchorElement)
+          if (link === undefined) return
+          window.openedLinks?.push(link.href)
+          event.preventDefault()
+        })
+      })
+      await page.locator("#MainTree .tip").first().click()
+      const accession = page.getByRole("link", { name: "PX260180", exact: true })
+      await accession.click()
+      assert.deepEqual(await page.evaluate(() => window.openedLinks), [ACCESSION_URL])
+      await page.getByText("Accession", { exact: true }).click()
+      assert.equal(await accession.count(), 1)
+      await page
+        .locator(".panel")
+        .locator("..")
+        .click({ position: { x: 5, y: 5 } })
+      await accession.waitFor({ state: "detached" })
       assert.deepEqual(pageErrors, [])
     },
   },
@@ -1779,5 +1822,6 @@ declare global {
     viewerMessages?: readonly unknown[]
     treeButtonDownloads?: { filename: string; content: string }[]
     tipPositions?: { last: string; stableFrames: number }
+    openedLinks?: string[]
   }
 }

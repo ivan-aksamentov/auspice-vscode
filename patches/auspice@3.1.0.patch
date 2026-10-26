@@ -1184,17 +1184,20 @@ index 0e85d44ae0212e6c531501d74031f48e219e0f8e..172f13f161f3bab59a843d5a81215523
  }
  
 diff --git a/src/components/modal/Modal.jsx b/src/components/modal/Modal.jsx
-index 364b7ebb8fe6c88998699559405e490c6fcb85ae..05fc2460a8500c9e66e146ee0a3047d7ff6585be 100644
+index 364b7ebb8fe6c88998699559405e490c6fcb85ae..8199e27e7caab527a3b601e91faa3cfa0e3939af 100644
 --- a/src/components/modal/Modal.jsx
 +++ b/src/components/modal/Modal.jsx
-@@ -3,6 +3,7 @@ import Mousetrap from "mousetrap";
+@@ -3,8 +3,9 @@ import Mousetrap from "mousetrap";
  import { connect } from "react-redux";
  import { withTranslation } from 'react-i18next';
  import { SET_MODAL } from "../../actions/types";
 +import { hasExtension, getExtension } from "../../util/extensions";
  import { infoPanelStyles } from "../../globalStyles";
- import { stopProp } from "../tree/infoPanels/click";
+-import { stopProp } from "../tree/infoPanels/click";
++import { closeOnBackdropClick } from "../tree/infoPanels/click";
  import DownloadModalContents from "../download/downloadModal";
+ import { LinkOutModalContents } from "./LinkOutModalContents.jsx";
+ import DatasetSelector, {datasetSelectorStyles} from "../datasetSelector/datasetSelector.tsx";
 @@ -26,6 +27,8 @@ class Modal extends React.Component {
     * and if _any_ modal's open pressing 'd' dismisses it
     */
@@ -1204,6 +1207,48 @@ index 364b7ebb8fe6c88998699559405e490c6fcb85ae..05fc2460a8500c9e66e146ee0a3047d7
      Mousetrap.bind('d', () => {
        this.props.dispatch({ type: SET_MODAL, modal: this.props.modal ? null : 'download' });
      });
+@@ -98,8 +101,8 @@ class Modal extends React.Component {
+     }
+ 
+     return (
+-      <div style={styles.container} onClick={clickOutsideToClose && this.dismissModal}>
+-        <div style={styles.panel} onClick={(e) => stopProp(e)}>
++      <div style={styles.container} onClick={clickOutsideToClose ? closeOnBackdropClick(this.dismissModal) : undefined}>
++        <div style={styles.panel}>
+           {clickOutsideToClose &&
+             <p style={styles.dismissMsg}>
+               ({t("click outside this box to return to the app")})
+diff --git a/src/components/tree/infoPanels/click.js b/src/components/tree/infoPanels/click.js
+index 68b6b1c07ad04562f9d8f27d46982c331eddc21b..1976d947d44412dfd3b89771b630d1e792ec5cd6 100644
+--- a/src/components/tree/infoPanels/click.js
++++ b/src/components/tree/infoPanels/click.js
+@@ -27,10 +27,11 @@ export const styles = {
+   }
+ };
+ 
+-export const stopProp = (e) => {
+-  if (!e) {e = window.event;}
+-  e.cancelBubble = true;
+-  if (e.stopPropagation) {e.stopPropagation();}
++/* Return a click handler for the backdrop of a panel that calls `close` only for a click on the backdrop itself.
++ * Clicks inside the panel keep bubbling, so that an embedding page sees them: a VS Code webview opens a link
++ * only from the click that reaches its window. */
++export const closeOnBackdropClick = (close) => (e) => {
++  if (e.target === e.currentTarget) close();
+ };
+ 
+ /* min width to get "collection date" on 1 line: 120 */
+@@ -277,8 +278,8 @@ const NodeClickedPanel = ({selectedNode, nodesLhsTree, nodesRhsTree, clearSelect
+   const shouldShowNodeName = tipLabelKey!==strainSymbol || !isTerminal;
+ 
+   return (
+-    <div style={infoPanelStyles.modalContainer} onClick={() => clearSelectedNode(selectedNode)}>
+-      <div className={"panel"} style={panelStyle} onClick={(e) => stopProp(e)}>
++    <div style={infoPanelStyles.modalContainer} onClick={closeOnBackdropClick(() => clearSelectedNode(selectedNode))}>
++      <div className={"panel"} style={panelStyle}>
+         <StrainName>{nodeDisplayName(t, node, tipLabelKey, !isTip)}</StrainName>
+         <table>
+           <tbody>
 diff --git a/src/components/tree/phyloTree/change.ts b/src/components/tree/phyloTree/change.ts
 index 911bb2cc1f89c896b22ed28d3517649cc2505f8f..8ff35fbe14412ee1156e3c4bcd4de851cc473870 100644
 --- a/src/components/tree/phyloTree/change.ts

@@ -8,6 +8,10 @@
 - **Status in the status bar**: the VS Code status bar shows when the viewer loads, when its input files changed on disk, and how many errors the inputs have. A click reloads the view or shows the errors in the Problems panel. A window without WebGL tells in a notification why added coordinates show no map. Before, the toolbar of the viewer showed this text
 - **No Taxonium command**: the command Open Current Tree in Taxonium and its button are removed. They only opened `https://taxonium.org/` in the browser or copied the path of the dataset, and you selected the file in Taxonium yourself
 
+### Tip panel
+
+- **Links of a tip open in the browser**: the links in the panel of a clicked tip (Accession, Genbank accession, GISAID EPI ISL, Strain URL) open the linked page, as the links above the tree do. Before, a click on them did nothing
+
 ### Errors
 
 - **Load errors stay on screen**: when a dataset cannot be loaded, the viewer keeps showing the list of errors. Before, the list showed for a moment, and then the loading logo replaced it
