@@ -955,6 +955,31 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
+    name: "keeps the load errors on screen when the host clears the stale mark",
+    async run() {
+      const { page } = await openViewer(undefined, {
+        files: [{ name: "broken.auspice.json", text: "{ not json" }],
+      })
+      const heading = page.getByRole("heading", { name: "The dataset could not be loaded" })
+      await heading.waitFor()
+      // Oracle: the host clears the stale mark after each load (`loadComplete` in
+      // `src/viewerManager.ts`), and the dataset still failed to load
+      await page.evaluate(async () => {
+        const { promise, resolve: handled } = Promise.withResolvers<void>()
+        window.addEventListener(
+          "message",
+          () => {
+            setTimeout(handled)
+          },
+          { once: true },
+        )
+        window.postMessage({ type: "stale", stale: false }, "*")
+        await promise
+      })
+      assert.equal(await heading.count(), 1)
+    },
+  },
+  {
     name: "draws every tip of a partly dated tree by divergence",
     async run() {
       // Oracle: the placed sequence has no date, so it has no position on a time axis

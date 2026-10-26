@@ -6,6 +6,10 @@
 
 - **No Taxonium command**: the command Open Current Tree in Taxonium and its button are removed. They only opened `https://taxonium.org/` in the browser or copied the path of the dataset, and you selected the file in Taxonium yourself
 
+### Errors
+
+- **Load errors stay on screen**: when a dataset cannot be loaded, the viewer keeps showing the list of errors. Before, the list showed for a moment, and then the loading logo replaced it
+
 ## 0.4.0
 
 ### Auspice 3.1.0

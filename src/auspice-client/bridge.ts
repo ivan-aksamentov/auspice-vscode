@@ -40,6 +40,7 @@ const exportSchema = z.object({
 })
 let latestGeneration = -1
 let loadQueue = Promise.resolve()
+let status: ViewerStatus = { kind: "idle", message: "" }
 
 window.addEventListener("message", handleHostMessage)
 window.addEventListener("auspice-export", handleExport)
@@ -59,7 +60,12 @@ function handleHostMessage(event: MessageEvent<unknown>): void {
       return
     }
     case "stale":
-      dispatchStatus({ kind: "stale", message: parsed.data.stale ? "Inputs changed" : "" })
+      if (parsed.data.stale) {
+        dispatchStatus({ kind: "stale", message: "Inputs changed" })
+      } else if (status.kind === "stale") {
+        // Each load sets its own status, which the clearing must keep
+        dispatchStatus({ kind: "ready", message: "" })
+      }
       return
     case "supersede":
       latestGeneration = Math.max(latestGeneration, parsed.data.generation)
@@ -190,6 +196,7 @@ function handleExport(event: Event): void {
 }
 
 function dispatchStatus(detail: ViewerStatus): void {
+  status = detail
   window.dispatchEvent(new CustomEvent("auspice-vscode-status", { detail }))
 }
 
