@@ -738,7 +738,7 @@ const scenarios: readonly Scenario[] = [
       const areaBox = await page.locator(".auspice-vscode-panel-area").boundingBox()
       assert.ok(
         toggleBox !== null && areaBox !== null && toggleBox.y >= areaBox.y - 1,
-        "the narrative toggle covers the toolbar",
+        "the narrative toggle sits above the panel area",
       )
       assert.deepEqual(pageErrors, [])
     },
@@ -948,7 +948,24 @@ const scenarios: readonly Scenario[] = [
       })
       await page.locator("#MainTree .tip").first().waitFor()
       await addMetadata(page, [{ name: "places.csv", text: COORDINATES_CSV }])
-      await page.locator(".auspice-vscode-status").getByText(/WebGL/u).waitFor()
+      // The host shows a warning status as a notification
+      await page.waitForFunction(() =>
+        (window.viewerMessages ?? []).some(
+          (message) =>
+            typeof message === "object" &&
+            message !== null &&
+            "type" in message &&
+            message.type === "status" &&
+            "status" in message &&
+            typeof message.status === "object" &&
+            message.status !== null &&
+            "kind" in message.status &&
+            message.status.kind === "warning" &&
+            "message" in message.status &&
+            typeof message.status.message === "string" &&
+            message.status.message.includes("WebGL"),
+        ),
+      )
       assert.equal(await page.locator(".leaflet-container").count(), 0)
       assert.equal(await page.getByRole("checkbox", { name: "Show Map panel" }).count(), 0)
       assert.deepEqual(pageErrors, [])

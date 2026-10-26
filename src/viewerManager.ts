@@ -14,6 +14,8 @@ import {
   commands,
   env,
   RelativePattern,
+  StatusBarAlignment,
+  ThemeColor,
   ViewColumn,
   Uri as VsCodeUri,
   window,
@@ -23,7 +25,7 @@ import {
 import type { InputDiagnostic } from "./diagnostics.js"
 import { replaceDiagnostics } from "./diagnostics.js"
 import { exportFileName, exportFilters } from "./fileNames.js"
-import type { HostMessage, WebviewMessage } from "./protocol.js"
+import type { HostMessage, ViewerStatus, WebviewMessage } from "./protocol.js"
 import { webviewMessageSchema } from "./protocol.js"
 import {
   readResource,
@@ -31,6 +33,7 @@ import {
   resolveNarrativeDatasetUris,
   resourceLimitBytes,
 } from "./resources.js"
+import { statusBarPresentation } from "./viewerStatus.js"
 import { configureWebview } from "./webview.js"
 
 const VIEW_TYPE = "auspiceVscode.viewer"
@@ -58,6 +61,9 @@ export function createViewerManager(
   const sessions = new Set<ViewerSession>()
   const tabIconUri = VsCodeUri.joinPath(context.extensionUri, "assets", "img", "logo-tab-32.png")
   const diagnosticsBySession = new Map<symbol, readonly InputDiagnostic[]>()
+  const statusBySession = new Map<ViewerSession, ViewerStatus>()
+  const statusItem = window.createStatusBarItem("auspiceVscode.status", StatusBarAlignment.Right)
+  statusItem.name = "Auspice Viewer Status"
 
   async function open(uri?: Uri, selectedUris?: readonly Uri[]): Promise<void> {
     const primaries = selectedUris !== undefined && selectedUris.length > 0 ? selectedUris : [uri]
@@ -160,6 +166,7 @@ export function createViewerManager(
       sessions.delete(session)
       session.dispose()
       diagnosticsBySession.delete(session.diagnosticsKey)
+      statusBySession.delete(session)
       refreshDiagnostics()
       if (activeSession === session) {
         setActiveSession(Array.from(sessions).find((candidate) => candidate.panel.active))
@@ -170,6 +177,7 @@ export function createViewerManager(
 
   function setActiveSession(session: ViewerSession | undefined): void {
     activeSession = session
+    refreshStatus()
     void Promise.resolve(
       commands.executeCommand("setContext", "auspiceVscode.viewerActive", session !== undefined),
     ).catch((error: unknown) => {
@@ -193,6 +201,11 @@ export function createViewerManager(
       (items) => {
         diagnosticsBySession.set(diagnosticsKey, items)
         refreshDiagnostics()
+      },
+      (status) => {
+        statusBySession.set(session, status)
+        if (session === activeSession) refreshStatus()
+        if (status.kind === "warning") void window.showWarningMessage(`Auspice: ${status.message}`)
       },
       reloadWebview,
       comparisonUri,
@@ -221,7 +234,25 @@ export function createViewerManager(
     replaceDiagnostics(diagnostics, Array.from(diagnosticsBySession.values()).flat())
   }
 
+  function refreshStatus(): void {
+    const status = activeSession === undefined ? undefined : statusBySession.get(activeSession)
+    const presentation = status === undefined ? undefined : statusBarPresentation(status)
+    if (presentation === undefined) {
+      statusItem.hide()
+      return
+    }
+    statusItem.text = presentation.text
+    statusItem.tooltip = presentation.tooltip
+    statusItem.command = presentation.command
+    statusItem.backgroundColor =
+      presentation.backgroundColor === undefined
+        ? undefined
+        : new ThemeColor(presentation.backgroundColor)
+    statusItem.show()
+  }
+
   context.subscriptions.push(
+    statusItem,
     window.onDidChangeActiveTextEditor(() => {
       setActiveSession(Array.from(sessions).find((session) => session.panel.active))
     }),
@@ -286,6 +317,7 @@ function createViewerSession(
   uri: Uri,
   diagnosticsKey: symbol,
   updateDiagnostics: (diagnostics: readonly InputDiagnostic[]) => void,
+  updateStatus: (status: ViewerStatus) => void,
   reloadWebview: () => void,
   initialComparisonUri?: Uri,
 ): ViewerSession {
@@ -384,9 +416,6 @@ function createViewerSession(
       case "ready":
         await load()
         return
-      case "reload":
-        reloadWebview()
-        return
       case "saveExport":
         await saveExport(uri, message.filename, message.content)
         return
@@ -406,8 +435,8 @@ function createViewerSession(
         await sendMetadata()
         await panel.webview.postMessage({ type: "stale", stale: false } satisfies HostMessage)
         return
-      case "showDiagnostics":
-        await commands.executeCommand("workbench.actions.view.problems")
+      case "status":
+        updateStatus(message.status)
         return
       case "requestNarrativeDatasets":
         {

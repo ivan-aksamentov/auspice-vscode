@@ -1,8 +1,8 @@
 import React from "react"
 
 // A render error in an Auspice panel would otherwise unmount the whole tree and
-// leave a black screen. This boundary keeps the toolbar usable and shows the
-// error text so the failure is diagnosable instead of silent.
+// leave a black screen. This boundary shows the error text instead, so the
+// failure is diagnosable instead of silent.
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props)

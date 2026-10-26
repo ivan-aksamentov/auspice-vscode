@@ -190,8 +190,13 @@
           "group": "navigation@1"
         },
         {
+          "command": "auspiceVscode.reload",
+          "when": "activeCustomEditorId == auspiceVscode.viewer || activeWebviewPanelId == auspiceVscode.viewer",
+          "group": "navigation@2"
+        },
+        {
           "command": "auspiceVscode.showDiagnostics",
-          "when": "activeCustomEditorId == auspiceVscode.viewer"
+          "when": "activeCustomEditorId == auspiceVscode.viewer || activeWebviewPanelId == auspiceVscode.viewer"
         }
       ],
       "explorer/context": [

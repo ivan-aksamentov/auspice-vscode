@@ -2,10 +2,10 @@ import { handleFilesDropped } from "@auspice/actions/filesDropped/filesDropped"
 import i18n from "i18next"
 import { z } from "zod"
 
+import type { ViewerStatus } from "../protocol"
 import { loadIntoAuspice } from "./adapter"
 import { parseViewerResources } from "./input"
 import { vscode } from "./messages"
-import type { ViewerStatus } from "./messages"
 import { store } from "./store"
 
 const resourceSchema = z.object({
@@ -195,9 +195,11 @@ function handleExport(event: Event): void {
   })
 }
 
+// The splash shows the status in the page, and the host in the VS Code window
 function dispatchStatus(detail: ViewerStatus): void {
   status = detail
   window.dispatchEvent(new CustomEvent("auspice-vscode-status", { detail }))
+  vscode.postMessage({ type: "status", status: detail })
 }
 
 interface LoadMessage {

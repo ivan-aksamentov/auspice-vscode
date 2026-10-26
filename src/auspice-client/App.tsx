@@ -6,7 +6,6 @@ import { ViewerSplash } from "./components"
 import { createPanelDimensionDispatcher } from "./dimensions"
 import { ErrorBoundary } from "./ErrorBoundary"
 import { store } from "./store"
-import { Toolbar } from "./Toolbar"
 import { ViewerMain } from "./ViewerMain"
 
 // The shell owns the chrome and the layout (`ViewerMain`). Auspice components
@@ -14,8 +13,8 @@ import { ViewerMain } from "./ViewerMain"
 // `state.browserDimensions`, which Auspice's `<Monitor>` fills from `window`.
 // Coupling to the window makes the view look zoomed and animate in from a tiny
 // size when the webview tab is shown again. Instead, a ResizeObserver on the
-// viewer container feeds the real available size (below the toolbar) into the
-// store, so the components are correct on first paint.
+// viewer container feeds the real available size into the store, so the
+// components are correct on first paint.
 export function App(): React.ReactElement {
   const panelsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -47,7 +46,6 @@ export function App(): React.ReactElement {
   return (
     <Provider store={store}>
       <div className="auspice-vscode-shell">
-        <Toolbar />
         <div className="auspice-vscode-panels" ref={panelsRef}>
           <DisplaySwitch />
         </div>

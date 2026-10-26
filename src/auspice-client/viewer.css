@@ -153,8 +153,7 @@
 
 /*
  * The panel area. Layout containment makes it the containing block of fixed-position Auspice
- * elements (the narrative toggle), which would otherwise anchor to the whole viewer and cover the
- * toolbar.
+ * elements (the narrative toggle), which would otherwise anchor to the whole viewer.
  */
 .auspice-vscode-panel-area {
   background: #fff;
@@ -201,79 +200,17 @@
 }
 
 /*
- * The shell chrome (toolbar, error page) uses the VS Code font. Auspice's global stylesheet sets
- * Lato on every `div` and `button`, so these rules name the font on the elements themselves.
+ * The error page uses the VS Code font. Auspice's global stylesheet sets Lato on every `div`, so
+ * this rule names the font on the element itself.
  */
-.auspice-vscode-toolbar,
-.auspice-vscode-button,
 .auspice-vscode-error {
   font-family: var(--vscode-font-family);
-}
-
-.auspice-vscode-toolbar {
-  align-items: center;
-  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
-  border-bottom: 1px solid var(--vscode-sideBar-border, transparent);
-  box-sizing: border-box;
-  display: flex;
-  flex: 0 0 auto;
-  gap: 2px;
-  height: 36px;
-  padding: 0 8px;
-}
-
-.auspice-vscode-title {
-  color: var(--vscode-foreground);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  margin-right: 8px;
-}
-
-.auspice-vscode-button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 5px;
-  color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  cursor: pointer;
-  display: inline-flex;
-  height: 26px;
-  justify-content: center;
-  padding: 0;
-  width: 28px;
-}
-
-.auspice-vscode-button:hover {
-  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
-}
-
-.auspice-vscode-button:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
 }
 
 .auspice-vscode-tree-download svg {
   color: #888;
   margin-right: 4px;
   vertical-align: -1px;
-}
-
-.auspice-vscode-status {
-  font-size: 12px;
-  margin-left: auto;
-  opacity: 0.85;
-}
-
-.auspice-vscode-status-error {
-  color: var(--vscode-errorForeground, #f48771);
-  opacity: 1;
-}
-
-.auspice-vscode-status-stale,
-.auspice-vscode-status-warning {
-  color: var(--vscode-editorWarning-foreground, #cca700);
-  opacity: 1;
 }
 
 .auspice-vscode-error {

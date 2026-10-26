@@ -51,7 +51,8 @@ Each primary dataset opens in its own tab with an independent store and file lif
 
 - **Command palette** -- run **Auspice: Open in Auspice** to open the active file, or **Auspice: Toggle Auspice** to switch the active file between the viewer and the text editor.
 - **File context menu** -- right-click a supported file in the Explorer sidebar and choose **Open in Auspice**.
-- **Editor title button** -- when a supported file is open, click the tree icon in the editor title bar to toggle between the viewer and the text editor.
+- **Editor title buttons** -- when a supported file is open, click the tree icon in the editor title bar to toggle between the viewer and the text editor. In a viewer, the refresh icon reloads the view: it starts the page again and reads the input files from disk.
+- **Status bar** -- the status bar shows when the active viewer loads, when its input files changed on disk (click to reload), and how many errors the inputs have (click to show them in the Problems panel).
 - **Reopen with** -- for any supported file, use **View -> Reopen Editor With...** and select **Auspice Tree Viewer**.
 - **Default association** -- to always open dedicated file types in the viewer, add to your settings:
 

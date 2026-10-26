@@ -1,29 +1,10 @@
 import React from "react"
 
-// Inline stroke icons (16x16, currentColor) so the toolbar needs no icon font,
+// Inline stroke icons (16x16, currentColor) so the viewer needs no icon font,
 // no extra CSP font-src, and renders identically under Auspice's React 16.
 
 export interface IconProps {
   readonly size?: number
-}
-
-export function IconReload({ size = 16 }: IconProps): React.ReactElement {
-  return (
-    <Svg size={size}>
-      <path d="M13.5 3.5V6.5H10.5" />
-      <path d="M13.1 6.5A5.5 5.5 0 1 0 13.9 9.5" />
-    </Svg>
-  )
-}
-
-export function IconProblems({ size = 16 }: IconProps): React.ReactElement {
-  return (
-    <Svg size={size}>
-      <path d="M8 1.8 15 14H1L8 1.8Z" />
-      <path d="M8 6.5V9.5" />
-      <path d="M8 11.8V11.9" />
-    </Svg>
-  )
 }
 
 export function IconDownload({ size = 16 }: IconProps): React.ReactElement {

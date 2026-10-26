@@ -6,8 +6,8 @@ import { useViewerStatus } from "./status"
 // Fills Auspice's "splash" display slot, which stays mounted from the first
 // paint until the dataset finishes building (`PAGE_CHANGE` to "main"). There is
 // no landing page: a view always has exactly one dataset, so the slot only ever
-// shows the load spinner or, if the load fails, the error. The toolbar carries
-// the accompanying status text.
+// shows the load spinner or, if the load fails, the error. The VS Code status
+// bar carries the accompanying status text.
 export function ViewerSplash(): React.ReactElement {
   const status = useViewerStatus()
   if (status.kind === "error") {

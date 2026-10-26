@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react"
 
-import { VIEWER_STATUS_KINDS } from "./messages"
-import type { ViewerStatus } from "./messages"
+import { viewerStatusSchema } from "../protocol"
+import type { ViewerStatus } from "../protocol"
 
-// The host reports load/ready/stale/error transitions to the webview via a
-// custom DOM event; the toolbar and splash subscribe through this hook.
+// The bridge reports load/ready/stale/error transitions via a custom DOM event;
+// the splash subscribes through this hook.
 export function useViewerStatus(): ViewerStatus {
   const [status, setStatus] = useState<ViewerStatus>({ kind: "idle", message: "" })
   useEffect(() => {
     function handleStatus(event: Event): void {
-      if (!(event instanceof CustomEvent) || !isViewerStatus(event.detail)) return
-      setStatus(event.detail)
+      if (!(event instanceof CustomEvent)) return
+      const parsed = viewerStatusSchema.safeParse(event.detail)
+      if (parsed.success) setStatus(parsed.data)
     }
     window.addEventListener("auspice-vscode-status", handleStatus)
     return () => {
@@ -18,16 +19,4 @@ export function useViewerStatus(): ViewerStatus {
     }
   }, [])
   return status
-}
-
-function isViewerStatus(value: unknown): value is ViewerStatus {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
-  if (!("kind" in value) || !("message" in value) || typeof value.message !== "string") return false
-  if (
-    "messages" in value &&
-    !(Array.isArray(value.messages) && value.messages.every((item) => typeof item === "string"))
-  ) {
-    return false
-  }
-  return VIEWER_STATUS_KINDS.some((kind) => kind === value.kind)
 }
