@@ -34,7 +34,6 @@ import {
 import { configureWebview } from "./webview.js"
 
 const VIEW_TYPE = "auspiceVscode.viewer"
-const TAXONIUM_URL = "https://taxonium.org/"
 const AUSPICE_LOCALES = new Set([
   "ar",
   "de",
@@ -91,11 +90,6 @@ export function createViewerManager(
 
   async function showDiagnostics(): Promise<void> {
     await commands.executeCommand("workbench.actions.view.problems")
-  }
-
-  async function openInTaxonium(): Promise<void> {
-    if (activeSession === undefined) return
-    await activeSession.openInTaxonium()
   }
 
   async function compareWithTree(): Promise<void> {
@@ -255,7 +249,6 @@ export function createViewerManager(
     open,
     reload,
     showDiagnostics,
-    openInTaxonium,
     compareWithTree,
     addMetadata,
     showInputs,
@@ -269,7 +262,6 @@ export interface ViewerManager {
   open(uri?: Uri, selectedUris?: readonly Uri[]): Promise<void>
   reload(): Promise<void>
   showDiagnostics(): Promise<void>
-  openInTaxonium(): Promise<void>
   compareWithTree(): Promise<void>
   addMetadata(): Promise<void>
   showInputs(): Promise<void>
@@ -282,7 +274,6 @@ interface ViewerSession {
   readonly identity: string | undefined
   readonly diagnosticsKey: symbol
   reload(): Promise<void>
-  openInTaxonium(): Promise<void>
   addMetadata(uris: readonly Uri[]): Promise<void>
   showInputs(): Promise<void>
   addSubscriptions(subscriptions: readonly Disposable[]): void
@@ -418,9 +409,6 @@ function createViewerSession(
       case "showDiagnostics":
         await commands.executeCommand("workbench.actions.view.problems")
         return
-      case "openInTaxonium":
-        await openInTaxonium()
-        return
       case "requestNarrativeDatasets":
         {
           const resolution = await resolveNarrativeDatasetUris(uri, message.names)
@@ -448,20 +436,6 @@ function createViewerSession(
         await load()
         return
     }
-  }
-
-  async function openInTaxonium(): Promise<void> {
-    const resourceDescriptor = resourceDescriptors.at(0)
-    if (resourceDescriptor === undefined) return
-    const action = await window.showInformationMessage(
-      "Taxonium is an external service. Choose the local file manually after opening it; this extension never uploads data automatically.",
-      "Copy file path",
-      "Open Taxonium",
-    )
-    if (action === "Copy file path") {
-      await env.clipboard.writeText(VsCodeUri.parse(resourceDescriptor.uri).fsPath)
-    }
-    if (action === "Open Taxonium") await env.openExternal(VsCodeUri.parse(TAXONIUM_URL))
   }
 
   async function addMetadata(uris: readonly Uri[]): Promise<void> {
@@ -566,7 +540,6 @@ function createViewerSession(
       reloadWebview()
       return Promise.resolve()
     },
-    openInTaxonium,
     addMetadata,
     showInputs,
     addSubscriptions(additionalSubscriptions): void {

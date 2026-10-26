@@ -22,7 +22,6 @@ export const webviewMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("loadComplete"), generation: z.number().int().nonnegative() }),
   z.object({ type: z.literal("showDiagnostics") }),
-  z.object({ type: z.literal("openInTaxonium") }),
   z.object({
     type: z.literal("requestNarrativeDatasets"),
     names: z.array(z.string().min(1)).min(1),

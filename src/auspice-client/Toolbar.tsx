@@ -1,7 +1,7 @@
 import React from "react"
 
-import { IconExternalLink, IconProblems, IconReload } from "./icons"
-import { postOpenInTaxonium, postReload, postShowDiagnostics } from "./messages"
+import { IconProblems, IconReload } from "./icons"
+import { postReload, postShowDiagnostics } from "./messages"
 import { useViewerStatus } from "./status"
 
 export function Toolbar(): React.ReactElement {
@@ -14,9 +14,6 @@ export function Toolbar(): React.ReactElement {
       </ToolbarButton>
       <ToolbarButton label="Show input problems" onClick={postShowDiagnostics}>
         <IconProblems />
-      </ToolbarButton>
-      <ToolbarButton label="Open current tree in Taxonium" onClick={postOpenInTaxonium}>
-        <IconExternalLink />
       </ToolbarButton>
       {status.message ? (
         <output className={`auspice-vscode-status auspice-vscode-status-${status.kind}`}>

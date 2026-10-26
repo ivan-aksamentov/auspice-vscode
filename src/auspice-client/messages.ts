@@ -35,7 +35,6 @@ export type ClientMessage =
   | { readonly type: "ready" }
   | { readonly type: "reload" }
   | { readonly type: "showDiagnostics" }
-  | { readonly type: "openInTaxonium" }
   | {
       readonly type: "saveExport"
       readonly filename: string
@@ -60,10 +59,6 @@ export function postReload(): void {
 
 export function postShowDiagnostics(): void {
   vscode.postMessage({ type: "showDiagnostics" })
-}
-
-export function postOpenInTaxonium(): void {
-  vscode.postMessage({ type: "openInTaxonium" })
 }
 
 function createViewerHost(): ViewerHost {

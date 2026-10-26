@@ -15,7 +15,6 @@ export async function run(): Promise<void> {
     registered.includes("auspiceVscode.showDiagnostics"),
     "diagnostics command is registered",
   )
-  assert.ok(registered.includes("auspiceVscode.openInTaxonium"), "Taxonium command is registered")
   assert.ok(
     registered.includes("auspiceVscode.compareWithTree"),
     "comparison command is registered",

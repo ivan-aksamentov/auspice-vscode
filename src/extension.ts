@@ -37,7 +37,6 @@ export function activate(context: ExtensionContext): void {
     }),
     commands.registerCommand("auspiceVscode.reload", () => manager.reload()),
     commands.registerCommand("auspiceVscode.showDiagnostics", () => manager.showDiagnostics()),
-    commands.registerCommand("auspiceVscode.openInTaxonium", () => manager.openInTaxonium()),
     commands.registerCommand("auspiceVscode.compareWithTree", () => manager.compareWithTree()),
     commands.registerCommand("auspiceVscode.addMetadata", () => manager.addMetadata()),
     commands.registerCommand("auspiceVscode.showInputs", () => manager.showInputs()),

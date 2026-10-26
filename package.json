@@ -119,12 +119,6 @@
         "icon": "$(issues)"
       },
       {
-        "command": "auspiceVscode.openInTaxonium",
-        "title": "Open Current Tree in Taxonium",
-        "category": "Auspice",
-        "icon": "$(link-external)"
-      },
-      {
         "command": "auspiceVscode.compareWithTree",
         "title": "Compare with Another Tree",
         "category": "Auspice",
@@ -214,10 +208,6 @@
         },
         {
           "command": "auspiceVscode.showDiagnostics",
-          "when": "auspiceVscode.viewerActive"
-        },
-        {
-          "command": "auspiceVscode.openInTaxonium",
           "when": "auspiceVscode.viewerActive"
         },
         {

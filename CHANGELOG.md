@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Commands
+
+- **No Taxonium command**: the command Open Current Tree in Taxonium and its button are removed. They only opened `https://taxonium.org/` in the browser or copied the path of the dataset, and you selected the file in Taxonium yourself
+
 ## 0.4.0
 
 ### Auspice 3.1.0
